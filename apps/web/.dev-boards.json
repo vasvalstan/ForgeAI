@@ -1,0 +1,35 @@
+[
+  {
+    "id": "dev-hytrvNQw",
+    "title": "Pricing Strategy Map",
+    "liveblocksRoomId": "forge-room-rEdtUVA8vVhT",
+    "ownerId": "dev-user",
+    "updatedAt": "2026-02-16T21:26:27.002Z",
+    "createdAt": "2026-02-16T21:26:27.002Z",
+    "_count": {
+      "discoveries": 0
+    }
+  },
+  {
+    "id": "dev-UfmfGxdx",
+    "title": "Login Redesign Discovery",
+    "liveblocksRoomId": "forge-room-amJptXAJ-9Lf",
+    "ownerId": "dev-user",
+    "updatedAt": "2026-02-16T21:26:26.987Z",
+    "createdAt": "2026-02-16T21:26:26.987Z",
+    "_count": {
+      "discoveries": 0
+    }
+  },
+  {
+    "id": "dev-gyNVfNk9",
+    "title": "Q1 User Research",
+    "liveblocksRoomId": "forge-room-BU2_JW_mzTHm",
+    "ownerId": "dev-user",
+    "updatedAt": "2026-02-16T21:26:26.977Z",
+    "createdAt": "2026-02-16T21:26:26.977Z",
+    "_count": {
+      "discoveries": 0
+    }
+  }
+]

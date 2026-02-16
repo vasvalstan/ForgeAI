@@ -1,0 +1,18 @@
+# ForgeAI Backend — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# AI Providers
+anthropic>=0.40.0
+openai>=1.60.0
+
+# Data Validation (must match Prisma schema)
+pydantic>=2.10.0
+
+# PostgreSQL (direct access from Python steps)
+psycopg2-binary>=2.9.10
+
+# LangSmith Tracing (Agentic Unit Testing)
+langsmith>=0.3.0
+
+# Numerical operations (vector handling)
+numpy>=2.0.0

@@ -1,0 +1,203 @@
+@import "tailwindcss";
+@import "tldraw/tldraw.css";
+
+/* ─── ForgeAI Design System v2 ─────────────────────────────── */
+@theme {
+  /* Backgrounds */
+  --color-ink-950: #070A12;
+  --color-ink-900: #0B1020;
+  --color-ink-850: #0E1630;
+
+  /* Primary Accent */
+  --color-tealx-500: #00D9FF;
+  --color-tealx-400: #33E1FF;
+  --color-tealx-300: #52F6E1;
+
+  /* Semantic Colors */
+  --color-forge-success: #34D399;
+  --color-forge-warning: #FBBF24;
+  --color-forge-danger: #F87171;
+  --color-forge-info: #60A5FA;
+
+  /* Text */
+  --color-forge-text: #F1F5F9;
+  --color-forge-text-secondary: #94A3B8;
+  --color-forge-text-dim: #64748B;
+
+  /* Borders */
+  --color-forge-border: rgba(255, 255, 255, 0.1);
+  --color-forge-border-subtle: rgba(255, 255, 255, 0.06);
+
+  /* Legacy aliases (smooth migration) */
+  --color-forge-bg: #070A12;
+  --color-forge-surface: #0B1020;
+  --color-forge-surface-2: #0E1630;
+  --color-forge-text-muted: #94A3B8;
+  --color-forge-accent: #00D9FF;
+  --color-forge-accent-hover: #33E1FF;
+  --color-forge-cyan: #00D9FF;
+  --color-forge-cyan-hover: #33E1FF;
+
+  /* Category Colors (dark-themed insight cards) */
+  --color-category-pain: #F87171;
+  --color-category-feature: #60A5FA;
+  --color-category-praise: #34D399;
+  --color-category-question: #FBBF24;
+
+  /* Typography */
+  --font-display: "Clash Grotesk", "Outfit", system-ui, -apple-system, sans-serif;
+  --font-sans: "Satoshi", "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Shadows */
+  --shadow-panel: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 50px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 0 1px rgba(0, 217, 255, 0.22), 0 18px 45px rgba(0, 0, 0, 0.55);
+  --shadow-glow-accent: 0 0 20px rgba(0, 217, 255, 0.3);
+  --shadow-glow-cyan: 0 0 20px rgba(0, 217, 255, 0.3);
+}
+
+/* ─── Base ───────────────────────────────────────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-forge-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Display Font Utility ───────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+/* ─── Glassmorphism Utilities ────────────────────────────── */
+.glass {
+  background: rgba(11, 16, 32, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-strong {
+  background: rgba(11, 16, 32, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ─── Shadow Utilities ───────────────────────────────────── */
+.shadow-panel {
+  box-shadow: var(--shadow-panel);
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* ─── ForgeAI Canvas Overrides ───────────────────────────── */
+.tl-background {
+  background: var(--color-ink-950) !important;
+}
+
+.tl-canvas {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 217, 255, 0.03) 0%,
+      transparent 70%
+    ) !important;
+}
+
+/* Subtle grid pattern overlay on canvas */
+.tl-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Drop Zone ──────────────────────────────────────────── */
+.drop-zone-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 10, 18, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.drop-zone-inner {
+  border: 2px dashed var(--color-tealx-500);
+  border-radius: 24px;
+  padding: 80px;
+  text-align: center;
+  box-shadow: var(--shadow-glow);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(0, 217, 255, 0.5);
+  }
+}
+
+/* ─── Card Entrance Animation ────────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 300ms ease-out both;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ─── Selection ──────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 217, 255, 0.3);
+  color: var(--color-forge-text);
+}

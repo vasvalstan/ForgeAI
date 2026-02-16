@@ -1,0 +1,16 @@
+# Motia Backend - ForgeAI Brain
+# Powered by iii (https://iii.dev/docs)
+
+name: forgeai-backend
+version: 0.2.0
+
+services:
+  motia:
+    image: motia
+    config:
+      port: 3111
+      steps_dir: ./steps
+      # Python steps require these env vars at runtime:
+      #   DATABASE_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY
+      #   LANGCHAIN_API_KEY, LANGCHAIN_PROJECT, LANGCHAIN_TRACING_V2
+      #   LIVEBLOCKS_SECRET_KEY
