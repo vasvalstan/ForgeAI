@@ -13,7 +13,12 @@ import type { MouseEvent } from "react";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ChatCircleDotsIcon,
+  CheckCircleIcon,
+  CircleIcon,
+  FileTextIcon,
+  ImageIcon,
   InfoIcon,
+  ListChecksIcon,
   PencilSimpleIcon,
   PushPinIcon,
   QuestionIcon,
@@ -23,6 +28,7 @@ import {
   StarIcon,
   WarningCircleIcon,
   WarningIcon,
+  WrenchIcon,
 } from "@phosphor-icons/react";
 
 // ─── Module Augmentation ────────────────────────────────────
@@ -65,6 +71,32 @@ declare module "tldraw" {
       authorColor: string;
       targetShapeId: string;
     };
+    "prd-card": {
+      w: number;
+      h: number;
+      title: string;
+      prdId: string;
+      status: string;
+      sectionCount: number;
+      insightCount: number;
+    };
+    "spec-card": {
+      w: number;
+      h: number;
+      title: string;
+      specId: string;
+      prdId: string;
+      status: string;
+      complexity: string;
+      taskCount: number;
+    };
+    "task-list": {
+      w: number;
+      h: number;
+      specId: string;
+      specTitle: string;
+      tasks: string; // JSON array: [{ id, title, status, complexity }]
+    };
   }
 }
 
@@ -74,6 +106,9 @@ type StickyNoteShape = TLShape<"sticky-note">;
 type FeatureCardShape = TLShape<"feature-card">;
 type RiskFlagShape = TLShape<"risk-flag">;
 type CommentShape = TLShape<"comment">;
+type PRDCardShape = TLShape<"prd-card">;
+type SpecCardShape = TLShape<"spec-card">;
+type TaskListShape = TLShape<"task-list">;
 type InlineComment = {
   id: string;
   text: string;
@@ -470,6 +505,50 @@ function CommentChip({
     >
       <ChatCircleDotsIcon size={12} />
     </button>
+  );
+}
+
+function VisualizeChip({
+  onClick,
+  title = "Generate visual mock",
+}: Readonly<{
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+}>) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(e);
+      }}
+      style={{
+        width: "22px",
+        height: "22px",
+        borderRadius: "8px",
+        border: `1px solid rgba(124, 58, 237, 0.18)`,
+        background: "rgba(124, 58, 237, 0.06)",
+        color: "#7C3AED",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+      }}
+    >
+      <ImageIcon size={12} />
+    </button>
+  );
+}
+
+function emitVisualize(
+  e: MouseEvent<HTMLButtonElement>,
+  detail: { shapeId: string; title: string; description: string; x: number; y: number }
+) {
+  e.stopPropagation();
+  globalThis.dispatchEvent(
+    new CustomEvent("forge:visualize-feature", { detail })
   );
 }
 
@@ -904,6 +983,18 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
                   })
                 }
               />
+              <VisualizeChip
+                title="Generate UI mock"
+                onClick={(e) =>
+                  emitVisualize(e, {
+                    shapeId: shape.id,
+                    title: shape.props.title,
+                    description: shape.props.description,
+                    x: shape.x,
+                    y: shape.y,
+                  })
+                }
+              />
             </div>
           </div>
 
@@ -1275,6 +1366,339 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
   }
 
   indicator(shape: RiskFlagShape) {
+    return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
+  }
+}
+
+// ─── PRD Card Shape Util ─────────────────────────────────────
+
+const PRD_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  draft: { bg: "rgba(100, 116, 139, 0.10)", text: "#475569", border: "rgba(100, 116, 139, 0.20)" },
+  review: { bg: "rgba(245, 158, 11, 0.10)", text: "#B45309", border: "rgba(245, 158, 11, 0.25)" },
+  approved: { bg: "rgba(22, 163, 74, 0.10)", text: "#15803D", border: "rgba(22, 163, 74, 0.25)" },
+};
+
+export class PRDCardShapeUtil extends ShapeUtil<PRDCardShape> {
+  static override readonly type = "prd-card" as const;
+
+  static override readonly props: RecordProps<PRDCardShape> = {
+    w: T.number,
+    h: T.number,
+    title: T.string,
+    prdId: T.string,
+    status: T.string,
+    sectionCount: T.number,
+    insightCount: T.number,
+  };
+
+  getDefaultProps(): PRDCardShape["props"] {
+    return { w: 360, h: 200, title: "Product Requirements Document", prdId: "", status: "draft", sectionCount: 0, insightCount: 0 };
+  }
+
+  getGeometry(shape: PRDCardShape): Geometry2d {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true });
+  }
+
+  override canResize() { return true; }
+  override onResize(shape: PRDCardShape, info: TLResizeInfo<PRDCardShape>) { return resizeBox(shape, info); }
+  override isAspectRatioLocked() { return false; }
+
+  component(shape: PRDCardShape) {
+    const statusColors = PRD_STATUS_COLORS[shape.props.status] ?? { bg: "rgba(100, 116, 139, 0.10)", text: "#475569", border: "rgba(100, 116, 139, 0.20)" };
+
+    return (
+      <HTMLContainer id={shape.id}>
+        <div
+          style={{
+            width: shape.props.w,
+            height: shape.props.h,
+            background: CARD_BASE.bg,
+            border: `1.5px solid rgba(37, 99, 235, 0.25)`,
+            borderRadius: "16px",
+            boxShadow: CARD_BASE.shadow,
+            padding: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            fontFamily: "var(--font-sans, system-ui)",
+            overflow: "hidden",
+            cursor: "pointer",
+          }}
+          onDoubleClick={() => {
+            globalThis.dispatchEvent(new CustomEvent("forge:open-prd", { detail: { prdId: shape.props.prdId } }));
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "10px",
+              background: "linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.06))",
+              border: "1px solid rgba(37, 99, 235, 0.18)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <FileTextIcon size={16} style={{ color: "#2563EB" }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", color: CARD_BASE.textDim, fontWeight: 600 }}>
+                PRD
+              </div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: CARD_BASE.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {shape.props.title}
+              </div>
+            </div>
+            <span style={{
+              fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em",
+              padding: "3px 8px", borderRadius: "6px",
+              background: statusColors.bg, color: statusColors.text, border: `1px solid ${statusColors.border}`,
+            }}>
+              {shape.props.status}
+            </span>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: "flex", gap: "16px", padding: "10px 0", borderTop: `1px solid ${CARD_BASE.borderSubtle}`, borderBottom: `1px solid ${CARD_BASE.borderSubtle}` }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700, color: "#2563EB" }}>{shape.props.sectionCount}</div>
+              <div style={{ fontSize: "10px", color: CARD_BASE.textDim, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sections</div>
+            </div>
+            <div style={{ width: "1px", background: CARD_BASE.borderSubtle }} />
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700, color: "#7C3AED" }}>{shape.props.insightCount}</div>
+              <div style={{ fontSize: "10px", color: CARD_BASE.textDim, textTransform: "uppercase", letterSpacing: "0.05em" }}>Insights</div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ fontSize: "11px", color: CARD_BASE.textDim }}>
+            Double-click to open PRD
+          </div>
+        </div>
+      </HTMLContainer>
+    );
+  }
+
+  indicator(shape: PRDCardShape) {
+    return <rect width={shape.props.w} height={shape.props.h} rx={16} ry={16} />;
+  }
+}
+
+// ─── Spec Card Shape Util ────────────────────────────────────
+
+const COMPLEXITY_COLORS: Record<string, { bg: string; text: string }> = {
+  xs: { bg: "rgba(22, 163, 74, 0.10)", text: "#15803D" },
+  s: { bg: "rgba(34, 197, 94, 0.10)", text: "#16A34A" },
+  m: { bg: "rgba(245, 158, 11, 0.10)", text: "#B45309" },
+  l: { bg: "rgba(239, 68, 68, 0.10)", text: "#DC2626" },
+  xl: { bg: "rgba(190, 18, 60, 0.10)", text: "#BE123C" },
+};
+
+export class SpecCardShapeUtil extends ShapeUtil<SpecCardShape> {
+  static override readonly type = "spec-card" as const;
+
+  static override readonly props: RecordProps<SpecCardShape> = {
+    w: T.number,
+    h: T.number,
+    title: T.string,
+    specId: T.string,
+    prdId: T.string,
+    status: T.string,
+    complexity: T.string,
+    taskCount: T.number,
+  };
+
+  getDefaultProps(): SpecCardShape["props"] {
+    return { w: 300, h: 160, title: "Technical Spec", specId: "", prdId: "", status: "draft", complexity: "m", taskCount: 0 };
+  }
+
+  getGeometry(shape: SpecCardShape): Geometry2d {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true });
+  }
+
+  override canResize() { return true; }
+  override onResize(shape: SpecCardShape, info: TLResizeInfo<SpecCardShape>) { return resizeBox(shape, info); }
+
+  component(shape: SpecCardShape) {
+    const cxColors = COMPLEXITY_COLORS[shape.props.complexity] ?? { bg: "rgba(245, 158, 11, 0.10)", text: "#B45309" };
+    const statusColors = PRD_STATUS_COLORS[shape.props.status] ?? { bg: "rgba(100, 116, 139, 0.10)", text: "#475569", border: "rgba(100, 116, 139, 0.20)" };
+
+    return (
+      <HTMLContainer id={shape.id}>
+        <div
+          style={{
+            width: shape.props.w,
+            height: shape.props.h,
+            background: CARD_BASE.bg,
+            border: `1.5px solid rgba(124, 58, 237, 0.25)`,
+            borderRadius: "14px",
+            boxShadow: CARD_BASE.shadow,
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            fontFamily: "var(--font-sans, system-ui)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{
+              width: "28px", height: "28px", borderRadius: "8px",
+              background: "rgba(124, 58, 237, 0.10)",
+              border: "1px solid rgba(124, 58, 237, 0.18)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <WrenchIcon size={14} style={{ color: "#7C3AED" }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", color: CARD_BASE.textDim, fontWeight: 600 }}>
+                SPEC
+              </div>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: CARD_BASE.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {shape.props.title}
+              </div>
+            </div>
+          </div>
+
+          {/* Badges */}
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "5px",
+              background: statusColors.bg, color: statusColors.text, border: `1px solid ${statusColors.border}`,
+              textTransform: "uppercase", letterSpacing: "0.04em",
+            }}>
+              {shape.props.status}
+            </span>
+            {shape.props.complexity && (
+              <span style={{
+                fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "5px",
+                background: cxColors.bg, color: cxColors.text,
+                textTransform: "uppercase",
+              }}>
+                {shape.props.complexity.toUpperCase()}
+              </span>
+            )}
+            <span style={{
+              fontSize: "10px", fontWeight: 500, padding: "2px 7px", borderRadius: "5px",
+              background: "rgba(15, 23, 42, 0.04)", color: CARD_BASE.textDim,
+            }}>
+              {shape.props.taskCount} tasks
+            </span>
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: "auto", fontSize: "11px", color: CARD_BASE.textDim }}>
+            Click to view spec details
+          </div>
+        </div>
+      </HTMLContainer>
+    );
+  }
+
+  indicator(shape: SpecCardShape) {
+    return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
+  }
+}
+
+// ─── Task List Shape Util ────────────────────────────────────
+
+type TaskItem = { id: string; title: string; status: string; complexity?: string };
+
+export class TaskListShapeUtil extends ShapeUtil<TaskListShape> {
+  static override readonly type = "task-list" as const;
+
+  static override readonly props: RecordProps<TaskListShape> = {
+    w: T.number,
+    h: T.number,
+    specId: T.string,
+    specTitle: T.string,
+    tasks: T.string,
+  };
+
+  getDefaultProps(): TaskListShape["props"] {
+    return { w: 280, h: 200, specId: "", specTitle: "", tasks: "[]" };
+  }
+
+  getGeometry(shape: TaskListShape): Geometry2d {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true });
+  }
+
+  override canResize() { return true; }
+  override onResize(shape: TaskListShape, info: TLResizeInfo<TaskListShape>) { return resizeBox(shape, info); }
+
+  component(shape: TaskListShape) {
+    let tasks: TaskItem[] = [];
+    try { tasks = JSON.parse(shape.props.tasks); } catch { /* empty */ }
+
+    const done = tasks.filter((t) => t.status === "done").length;
+
+    return (
+      <HTMLContainer id={shape.id}>
+        <div
+          style={{
+            width: shape.props.w,
+            height: shape.props.h,
+            background: CARD_BASE.bg,
+            border: `1.5px solid rgba(22, 163, 74, 0.25)`,
+            borderRadius: "14px",
+            boxShadow: CARD_BASE.shadow,
+            padding: "14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            fontFamily: "var(--font-sans, system-ui)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ListChecksIcon size={16} style={{ color: "#16A34A" }} />
+            <div style={{ fontSize: "12px", fontWeight: 600, color: CARD_BASE.text, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {shape.props.specTitle || "Tasks"}
+            </div>
+            <span style={{ fontSize: "10px", color: CARD_BASE.textDim, fontWeight: 500 }}>
+              {done}/{tasks.length}
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ height: "4px", borderRadius: "2px", background: "rgba(15, 23, 42, 0.06)" }}>
+            <div style={{ height: "100%", borderRadius: "2px", background: "#16A34A", width: `${tasks.length > 0 ? (done / tasks.length) * 100 : 0}%`, transition: "width 0.3s" }} />
+          </div>
+
+          {/* Task list */}
+          <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", gap: "4px" }}>
+            {tasks.slice(0, 8).map((task) => (
+              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", lineHeight: "1.3" }}>
+                {task.status === "done"
+                  ? <CheckCircleIcon size={13} style={{ color: "#16A34A", flexShrink: 0 }} />
+                  : <CircleIcon size={13} style={{ color: CARD_BASE.textDim, flexShrink: 0 }} />
+                }
+                <span style={{
+                  color: task.status === "done" ? CARD_BASE.textDim : CARD_BASE.text,
+                  textDecoration: task.status === "done" ? "line-through" : "none",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1,
+                }}>
+                  {task.title}
+                </span>
+                {task.complexity && (
+                  <span style={{ fontSize: "9px", fontWeight: 600, color: CARD_BASE.textDim, textTransform: "uppercase" }}>
+                    {task.complexity}
+                  </span>
+                )}
+              </div>
+            ))}
+            {tasks.length > 8 && (
+              <div style={{ fontSize: "10px", color: CARD_BASE.textDim }}>
+                +{tasks.length - 8} more tasks
+              </div>
+            )}
+          </div>
+        </div>
+      </HTMLContainer>
+    );
+  }
+
+  indicator(shape: TaskListShape) {
     return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
   }
 }

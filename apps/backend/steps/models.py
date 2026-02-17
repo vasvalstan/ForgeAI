@@ -126,6 +126,54 @@ class PRDRead(BaseModel):
     updatedAt: datetime
 
 
+# ─── Spec Models ─────────────────────────────────────────
+
+class SpecCreate(BaseModel):
+    boardId: str
+    prdId: Optional[str] = None
+    title: str
+    content: str
+    shapeId: Optional[str] = None
+    status: str = "draft"  # draft | review | approved | shipped
+    complexity: Optional[str] = None  # xs | s | m | l | xl
+
+
+class SpecRead(BaseModel):
+    id: str
+    boardId: str
+    prdId: Optional[str] = None
+    title: str
+    content: str
+    shapeId: Optional[str] = None
+    status: str
+    complexity: Optional[str] = None
+    createdAt: datetime
+    updatedAt: datetime
+
+
+# ─── Task Models ─────────────────────────────────────────
+
+class TaskCreate(BaseModel):
+    specId: str
+    title: str
+    description: str
+    complexity: Optional[str] = None  # xs | s | m | l | xl
+    status: str = "todo"  # todo | in_progress | done
+
+
+class TaskRead(BaseModel):
+    id: str
+    specId: str
+    title: str
+    description: str
+    complexity: Optional[str] = None
+    githubIssueUrl: Optional[str] = None
+    githubIssueId: Optional[int] = None
+    status: str
+    createdAt: datetime
+    updatedAt: datetime
+
+
 # ─── Meeting Note Models ──────────────────────────────────
 
 class MeetingNoteCreate(BaseModel):

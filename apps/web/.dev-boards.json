@@ -1,44 +1,22 @@
 [
   {
-    "id": "dev-ebbzHzgh",
-    "title": "test",
-    "liveblocksRoomId": "forge-room-h9qbBZ_5yM9M",
+    "id": "dev-Tm0J2--T",
+    "title": "new board",
+    "liveblocksRoomId": "forge-room-ApG82iFEdXh7",
     "ownerId": "dev-user",
-    "updatedAt": "2026-02-17T15:18:21.435Z",
-    "createdAt": "2026-02-17T15:18:21.435Z",
+    "updatedAt": "2026-02-17T17:34:00.395Z",
+    "createdAt": "2026-02-17T17:34:00.395Z",
     "_count": {
       "discoveries": 0
     }
   },
   {
-    "id": "dev-hytrvNQw",
-    "title": "Pricing Strategy Map",
-    "liveblocksRoomId": "forge-room-rEdtUVA8vVhT",
+    "id": "dev-EIyW2u-6",
+    "title": "hello",
+    "liveblocksRoomId": "forge-room-dNhVo2xtwkJo",
     "ownerId": "dev-user",
-    "updatedAt": "2026-02-16T21:26:27.002Z",
-    "createdAt": "2026-02-16T21:26:27.002Z",
-    "_count": {
-      "discoveries": 0
-    }
-  },
-  {
-    "id": "dev-UfmfGxdx",
-    "title": "Login Redesign Discovery",
-    "liveblocksRoomId": "forge-room-amJptXAJ-9Lf",
-    "ownerId": "dev-user",
-    "updatedAt": "2026-02-16T21:26:26.987Z",
-    "createdAt": "2026-02-16T21:26:26.987Z",
-    "_count": {
-      "discoveries": 0
-    }
-  },
-  {
-    "id": "dev-gyNVfNk9",
-    "title": "Q1 User Research",
-    "liveblocksRoomId": "forge-room-BU2_JW_mzTHm",
-    "ownerId": "dev-user",
-    "updatedAt": "2026-02-16T21:26:26.977Z",
-    "createdAt": "2026-02-16T21:26:26.977Z",
+    "updatedAt": "2026-02-17T17:33:45.134Z",
+    "createdAt": "2026-02-17T17:33:45.134Z",
     "_count": {
       "discoveries": 0
     }

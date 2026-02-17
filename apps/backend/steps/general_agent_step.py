@@ -9,25 +9,24 @@ Trigger: queue event "general.ask"
 
 import json
 import os
+import sys
 from typing import Any
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import anthropic
 import openai
 from langsmith import traceable
 
-from db import get_board_insights, find_similar_insights
+from db import get_board_insights, find_similar_insights, create_conversation, create_message
+from models import ConversationCreate, MessageCreate
 
-# Motia step config
 config = {
+    "type": "event",
     "name": "GeneralAgent",
     "description": "Answers product strategy questions using board context and semantic memory",
-    "triggers": [
-        {
-            "type": "queue",
-            "topic": "general.ask",
-        }
-    ],
-    "enqueues": [],
+    "subscribes": ["general.ask"],
+    "emits": [],
     "flows": ["general-flow"],
 }
 
@@ -137,5 +136,25 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
             f"Please check that ANTHROPIC_API_KEY is configured."
         )
 
-    # Future: Save to Conversation/Message table for history
+    # Save to Conversation/Message table for history
+    try:
+        conv_id = create_conversation(ConversationCreate(
+            boardId=board_id,
+            title=question[:60] if question else "Q&A",
+        ))
+        create_message(MessageCreate(
+            conversationId=conv_id,
+            role="user",
+            content=question,
+        ))
+        create_message(MessageCreate(
+            conversationId=conv_id,
+            role="assistant",
+            content=answer,
+            status="completed",
+        ))
+        ctx.logger.info(f"Saved conversation {conv_id} with Q&A")
+    except Exception as e:
+        ctx.logger.warn(f"Could not persist conversation: {e}")
+
     ctx.logger.info(f"General Agent complete for board {board_id}")

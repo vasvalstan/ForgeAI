@@ -84,7 +84,25 @@ export async function POST(req: NextRequest) {
 
     if (db) {
       const session = await getSessionSafe();
-      const ownerId = session?.user?.id ?? "dev-user";
+      let ownerId = session?.user?.id;
+
+      if (!ownerId) {
+        // Ensure a dev user exists for unauthenticated local development
+        const devUser = await db.user.upsert({
+          where: { id: "dev-user" },
+          update: {},
+          create: {
+            id: "dev-user",
+            name: "Dev User",
+            email: "dev@forgeai.local",
+            emailVerified: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+        ownerId = devUser.id;
+      }
+
       const board = await db.board.create({
         data: {
           title: title.trim(),

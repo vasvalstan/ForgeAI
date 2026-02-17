@@ -14,7 +14,10 @@ import math
 import os
 import random
 import re
-from typing import Any
+import sys
+from typing import Any, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import anthropic
 import openai
@@ -27,17 +30,12 @@ from db import (
     get_discovery,
 )
 
-# Motia step config
 config = {
+    "type": "event",
     "name": "DiscoveryAgent",
     "description": "Analyzes transcripts and clusters insights into spatial sticky notes",
-    "triggers": [
-        {
-            "type": "queue",
-            "topic": "discovery.analyze",
-        }
-    ],
-    "enqueues": ["canvas.update"],
+    "subscribes": ["discovery.analyze"],
+    "emits": ["canvas.update"],
     "flows": ["discovery-flow"],
 }
 
@@ -65,24 +63,58 @@ Prioritize pain points and feature requests as they drive product decisions.
 
 Return your response as a JSON array of objects with the fields above."""
 
+MEETING_NOTES_SYSTEM_PROMPT = """You are a Product Discovery Analyst. Your task is to analyze meeting notes and extract structured insights.
+
+For each insight, provide:
+- category: one of "pain_point", "feature_request", "praise", "question", "action_item", or "decision"
+- content: a clear, concise summary of the insight (1-2 sentences)
+- quote: the exact verbatim quote from the notes that supports this insight
+- sentiment: a float from -1.0 (very negative) to 1.0 (very positive)
+- quote_start: the character offset where the quote begins in the original text
+- quote_end: the character offset where the quote ends in the original text
+
+Additional categories for meeting notes:
+- action_item: a task or follow-up agreed upon during the meeting
+- decision: a decision that was made during the meeting
+
+Extract at most 20 insights. Focus on actionable items and key decisions.
+
+Return your response as a JSON array of objects with the fields above."""
+
 
 def compute_spatial_layout(
-    insights: list[dict], canvas_center: tuple = (400, 300)
+    insights: list[dict],
+    connections: Optional[list] = None,
+    canvas_center: tuple = (400, 300),
 ) -> list[dict]:
     """
-    Compute force-directed spatial positions for insights.
-    Groups by category anchors but allows semantically similar notes to pull together.
+    Connection-aware force-directed layout engine.
+
+    Uses three forces:
+      A. Repulsion — prevents overlap between all node pairs
+      B. Category anchor attraction — pulls nodes toward semantic quadrants
+      C. Connection spring force — pulls explicitly connected insights together
+
+    Additionally uses keyword-overlap edges so semantically similar notes
+    cluster even without explicit connections.
     """
     if not insights:
         return []
 
+    if connections is None:
+        connections = []
+
     card_w = 260
     card_h = 180
-    category_positions = {
-        "pain_point": (-300, -200),
-        "feature_request": (300, -200),
-        "praise": (-300, 200),
-        "question": (300, 200),
+
+    # Wide quadrant anchors — gives the canvas room to breathe
+    category_anchors = {
+        "pain_point":      (canvas_center[0] - 600, canvas_center[1] - 400),
+        "feature_request": (canvas_center[0] + 600, canvas_center[1] - 400),
+        "praise":          (canvas_center[0] - 600, canvas_center[1] + 400),
+        "question":        (canvas_center[0] + 600, canvas_center[1] + 400),
+        "action_item":     (canvas_center[0],       canvas_center[1] + 500),
+        "decision":        (canvas_center[0],       canvas_center[1] - 500),
     }
 
     def tokenize(text: str) -> set[str]:
@@ -96,50 +128,52 @@ def compute_spatial_layout(
 
     token_sets = [tokenize(ins.get("content", "")) for ins in insights]
 
-    # Build semantic attraction edges from keyword overlap.
-    # This keeps related ideas near each other without rigid grid placement.
-    attraction_edges: list[tuple[int, int, float]] = []
+    # Build semantic attraction edges from keyword overlap
+    semantic_edges: list[tuple[int, int, float]] = []
     for i in range(len(insights)):
         for j in range(i + 1, len(insights)):
             overlap = len(token_sets[i] & token_sets[j])
             if overlap >= 2:
-                attraction_edges.append((i, j, min(1.0, overlap / 6.0)))
+                semantic_edges.append((i, j, min(1.0, overlap / 6.0)))
 
-    # Initial positions around category anchors with jitter.
+    # Initial positions around category anchors with jitter
+    n = len(insights)
     positions: list[list[float]] = []
     velocities: list[list[float]] = []
     for insight in insights:
         cat = insight.get("category", "question")
-        anchor_x, anchor_y = category_positions.get(cat, (0, 0))
+        anchor_x, anchor_y = category_anchors.get(cat, canvas_center)
         angle = random.uniform(0, math.tau)
-        radius = random.uniform(60, 180)
-        x = canvas_center[0] + anchor_x + math.cos(angle) * radius
-        y = canvas_center[1] + anchor_y + math.sin(angle) * radius
-        positions.append([x, y])
+        radius = random.uniform(60, 200)
+        positions.append([
+            anchor_x + math.cos(angle) * radius,
+            anchor_y + math.sin(angle) * radius,
+        ])
         velocities.append([0.0, 0.0])
 
-    repulsion = 26000.0
-    anchor_strength = 0.03
-    attraction_strength = 0.05
-    target_edge_len = 240.0
-    damping = 0.82
-    max_step = 24.0
-    min_x, max_x = canvas_center[0] - 900, canvas_center[0] + 900
-    min_y, max_y = canvas_center[1] - 700, canvas_center[1] + 700
+    # Simulation parameters
+    ITERATIONS = 70
+    K_REPULSION = 30000.0
+    ANCHOR_STRENGTH = 0.035
+    SEMANTIC_STRENGTH = 0.05
+    LINK_STRENGTH = 0.18         # Spring tension for explicit connections
+    TARGET_EDGE_LEN = 240.0
+    DAMPING = 0.80
+    MAX_STEP = 26.0
+    BOUNDS_X = (canvas_center[0] - 1000, canvas_center[0] + 1000)
+    BOUNDS_Y = (canvas_center[1] - 800,  canvas_center[1] + 800)
 
-    iterations = 70
-    n = len(insights)
-    for _ in range(iterations):
+    for _ in range(ITERATIONS):
         forces = [[0.0, 0.0] for _ in range(n)]
 
-        # Pairwise repulsion to avoid overlap.
+        # A. Repulsion (avoid overlap)
         for i in range(n):
             for j in range(i + 1, n):
                 dx = positions[j][0] - positions[i][0]
                 dy = positions[j][1] - positions[i][1]
                 dist_sq = dx * dx + dy * dy + 1.0
                 dist = math.sqrt(dist_sq)
-                force = repulsion / dist_sq
+                force = K_REPULSION / dist_sq
                 fx = force * dx / dist
                 fy = force * dy / dist
                 forces[i][0] -= fx
@@ -147,22 +181,38 @@ def compute_spatial_layout(
                 forces[j][0] += fx
                 forces[j][1] += fy
 
-        # Pull nodes toward category anchors.
+        # B. Category anchor attraction
         for i, insight in enumerate(insights):
             cat = insight.get("category", "question")
-            anchor_x, anchor_y = category_positions.get(cat, (0, 0))
-            target_x = canvas_center[0] + anchor_x
-            target_y = canvas_center[1] + anchor_y
-            forces[i][0] += (target_x - positions[i][0]) * anchor_strength
-            forces[i][1] += (target_y - positions[i][1]) * anchor_strength
+            ax, ay = category_anchors.get(cat, canvas_center)
+            dx = ax - positions[i][0]
+            dy = ay - positions[i][1]
+            dist = math.sqrt(dx * dx + dy * dy) + 0.1
+            forces[i][0] += (dx / dist) * dist * ANCHOR_STRENGTH
+            forces[i][1] += (dy / dist) * dist * ANCHOR_STRENGTH
 
-        # Pull semantically similar notes together.
-        for i, j, weight in attraction_edges:
+        # C. Connection spring force (pull explicitly connected insights)
+        for conn in connections:
+            ci = conn.get("fromInsightIndex", 0)
+            cj = conn.get("toInsightIndex", 0)
+            if ci >= n or cj >= n:
+                continue
+            dx = positions[cj][0] - positions[ci][0]
+            dy = positions[cj][1] - positions[ci][1]
+            fx = dx * LINK_STRENGTH
+            fy = dy * LINK_STRENGTH
+            forces[ci][0] += fx
+            forces[ci][1] += fy
+            forces[cj][0] -= fx
+            forces[cj][1] -= fy
+
+        # D. Semantic attraction (keyword-overlap edges)
+        for i, j, weight in semantic_edges:
             dx = positions[j][0] - positions[i][0]
             dy = positions[j][1] - positions[i][1]
             dist = math.sqrt(dx * dx + dy * dy) + 1e-6
-            stretch = dist - target_edge_len
-            force = attraction_strength * weight * stretch
+            stretch = dist - TARGET_EDGE_LEN
+            force = SEMANTIC_STRENGTH * weight * stretch
             fx = force * dx / dist
             fy = force * dy / dist
             forces[i][0] += fx
@@ -170,21 +220,21 @@ def compute_spatial_layout(
             forces[j][0] -= fx
             forces[j][1] -= fy
 
-        # Integrate velocity + position with damping.
+        # E. Integrate velocity + position with damping
         for i in range(n):
-            velocities[i][0] = (velocities[i][0] + forces[i][0]) * damping
-            velocities[i][1] = (velocities[i][1] + forces[i][1]) * damping
+            velocities[i][0] = (velocities[i][0] + forces[i][0]) * DAMPING
+            velocities[i][1] = (velocities[i][1] + forces[i][1]) * DAMPING
 
             step = math.hypot(velocities[i][0], velocities[i][1])
-            if step > max_step:
-                scale = max_step / step
+            if step > MAX_STEP:
+                scale = MAX_STEP / step
                 velocities[i][0] *= scale
                 velocities[i][1] *= scale
 
-            positions[i][0] = max(min_x, min(max_x, positions[i][0] + velocities[i][0]))
-            positions[i][1] = max(min_y, min(max_y, positions[i][1] + velocities[i][1]))
+            positions[i][0] = max(BOUNDS_X[0], min(BOUNDS_X[1], positions[i][0] + velocities[i][0]))
+            positions[i][1] = max(BOUNDS_Y[0], min(BOUNDS_Y[1], positions[i][1] + velocities[i][1]))
 
-    # Small overlap resolution pass for dense boards.
+    # Overlap resolution pass for dense boards
     desired_gap = 230.0
     for _ in range(4):
         for i in range(n):
@@ -195,24 +245,16 @@ def compute_spatial_layout(
                 if dist >= desired_gap:
                     continue
                 push = (desired_gap - dist) * 0.5
-                nx = dx / dist
-                ny = dy / dist
+                nx, ny = dx / dist, dy / dist
                 positions[i][0] -= nx * push
                 positions[i][1] -= ny * push
                 positions[j][0] += nx * push
                 positions[j][1] += ny * push
 
-    positioned = []
-    for i, insight in enumerate(insights):
-        positioned.append({
-            **insight,
-            "x": round(positions[i][0]),
-            "y": round(positions[i][1]),
-            "w": card_w,
-            "h": card_h,
-        })
-
-    return positioned
+    return [
+        {**ins, "x": round(positions[i][0]), "y": round(positions[i][1]), "w": card_w, "h": card_h}
+        for i, ins in enumerate(insights)
+    ]
 
 
 def find_connections(insights: list[dict]) -> list[dict]:
@@ -238,18 +280,21 @@ def find_connections(insights: list[dict]) -> list[dict]:
 
 
 @traceable(name="extract-insights-claude", run_type="llm")
-async def extract_insights_with_claude(content: str, ctx: Any) -> list[dict]:
-    """Use Claude to extract structured insights from transcript text."""
+async def extract_insights_with_claude(content: str, ctx: Any, source_type: str = "transcript") -> list[dict]:
+    """Use Claude to extract structured insights from transcript or meeting notes."""
     try:
+        system_prompt = MEETING_NOTES_SYSTEM_PROMPT if source_type == "meeting_notes" else EXTRACTION_SYSTEM_PROMPT
+        label = "meeting notes" if source_type == "meeting_notes" else "transcript"
+
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=4096,
-            system=EXTRACTION_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[
                 {
                     "role": "user",
-                    "content": f"Analyze the following transcript and extract insights:\n\n---\n{content}\n---",
+                    "content": f"Analyze the following {label} and extract insights:\n\n---\n{content}\n---",
                 }
             ],
         )
@@ -358,11 +403,9 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
     discovery_id = data.get("discoveryId", "")
     board_id = data.get("boardId", "")
     content = data.get("content", "")
+    source_type = data.get("sourceType", "transcript")
 
-    ctx.logger.info(f"Discovery Agent processing: {discovery_id}", extra={
-        "boardId": board_id,
-        "contentLength": len(content),
-    })
+    ctx.logger.info(f"Discovery Agent processing: {discovery_id} board: {board_id} contentLen: {len(content)} source: {source_type}")
 
     # Update discovery status to processing
     try:
@@ -371,7 +414,7 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
         ctx.logger.warn(f"Could not update discovery status: {e}")
 
     # Step 1: Extract insights with Claude
-    raw_insights = await extract_insights_with_claude(content, ctx)
+    raw_insights = await extract_insights_with_claude(content, ctx, source_type=source_type)
 
     # Step 2: Generate embeddings for each insight
     insight_texts = [ins.get("content", "") for ins in raw_insights]
@@ -403,19 +446,19 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
     except Exception as e:
         ctx.logger.warn(f"Could not update discovery status: {e}")
 
-    # Step 4: Compute spatial layout
-    positioned_insights = compute_spatial_layout(raw_insights)
-
-    # Step 5: Find connections
+    # Step 4: Find connections between related insights
     connections = find_connections(raw_insights)
+
+    # Step 5: Compute connection-aware spatial layout
+    positioned_insights = compute_spatial_layout(raw_insights, connections)
 
     ctx.logger.info(
         f"Extracted {len(raw_insights)} insights, {len(connections)} connections",
         extra={"discoveryId": discovery_id},
     )
 
-    # Step 6: Enqueue canvas update
-    await ctx.enqueue("canvas.update", {
+    # Step 6: Emit canvas update
+    await ctx.emit({"topic": "canvas.update", "data": {
         "boardId": board_id,
         "discoveryId": discovery_id,
         "action": "explosion",
@@ -442,6 +485,6 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
             for idx, ins in enumerate(positioned_insights)
         ],
         "connections": connections,
-    })
+    }})
 
     ctx.logger.info(f"Canvas update enqueued for board {board_id}")

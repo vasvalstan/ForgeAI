@@ -4,11 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo 'Run: npx motia dev'",
+    "dev": "npx dotenv-cli -- npx motia dev --port 3111",
     "lint": "echo 'No lint configured for backend'"
   },
   "dependencies": {
     "@forge/db": "*",
+    "@motiadev/core": "0.17.14-beta.196",
+    "@motiadev/plugin-bullmq": "0.17.14-beta.196",
+    "@motiadev/plugin-cron": "0.17.14-beta.196",
+    "@motiadev/plugin-endpoint": "0.17.14-beta.196",
+    "@motiadev/plugin-logs": "0.17.14-beta.196",
+    "@motiadev/plugin-observability": "0.17.14-beta.196",
+    "@motiadev/plugin-states": "0.17.14-beta.196",
+    "@motiadev/plugin-streams": "0.17.14-beta.196",
+    "@motiadev/plugin-ws": "0.17.14-beta.196",
+    "motia": "^0.17.14-beta.196",
     "zod": "^3.25.43"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
   }
 }

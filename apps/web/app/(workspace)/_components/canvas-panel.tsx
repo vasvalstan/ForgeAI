@@ -1,24 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Tldraw, Editor, createShapeId } from "tldraw";
+import { Tldraw, Editor, createShapeId, AssetRecordType } from "tldraw";
 import {
   StickyNoteShapeUtil,
   FeatureCardShapeUtil,
   RiskFlagShapeUtil,
   CommentShapeUtil,
+  PRDCardShapeUtil,
+  SpecCardShapeUtil,
+  TaskListShapeUtil,
 } from "@/lib/canvas/shapes";
 import { DiscoveryDropZone } from "./discovery-drop-zone";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { ChatCircleDots, SquaresFour } from "@phosphor-icons/react";
 import { useSession } from "@/lib/auth-client";
-import { getPresenceColor } from "@/lib/liveblocks";
+import { getPresenceColor } from "@/lib/liveblocks-client";
 
 const customShapeUtils = [
   StickyNoteShapeUtil,
   FeatureCardShapeUtil,
   RiskFlagShapeUtil,
   CommentShapeUtil,
+  PRDCardShapeUtil,
+  SpecCardShapeUtil,
+  TaskListShapeUtil,
 ];
 
 type ShapeEditMode = "insight" | "feature" | "risk" | "comment" | "new_comment";
@@ -297,13 +303,99 @@ export function CanvasPanel() {
       setEditorDraft("");
     };
 
+    const handleVisualize = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.shapeId || !selectedBoardId) return;
+
+      const MOTIA_BASE = process.env.NEXT_PUBLIC_MOTIA_BASE_URL || "http://localhost:3111";
+      try {
+        await fetch(`${MOTIA_BASE}/visualize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            boardId: selectedBoardId,
+            shapeId: detail.shapeId,
+            description: `${detail.title}: ${detail.description}`,
+            x: detail.x ?? 0,
+            y: detail.y ?? 0,
+          }),
+        });
+
+        // Poll for shapes pushed by the backend via /api/canvas-updates
+        let attempts = 0;
+        const maxAttempts = 15; // 30 seconds max
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          try {
+            const res = await fetch(
+              `/api/canvas-updates?boardId=${encodeURIComponent(selectedBoardId)}`
+            );
+            if (!res.ok) return;
+            const { shapes } = await res.json();
+            if (shapes && shapes.length > 0) {
+              clearInterval(pollInterval);
+              const editor = editorRef.current;
+              if (!editor) return;
+
+              for (const shape of shapes) {
+                if (shape.type === "image" && shape.props?.url) {
+                  const assetId = AssetRecordType.createId();
+                  editor.createAssets([
+                    {
+                      id: assetId,
+                      type: "image",
+                      typeName: "asset",
+                      props: {
+                        name: shape.props.name ?? "mock.jpg",
+                        src: shape.props.url,
+                        w: shape.props.w ?? 600,
+                        h: shape.props.h ?? 400,
+                        mimeType: "image/jpeg",
+                        isAnimated: false,
+                      },
+                      meta: {},
+                    } as any,
+                  ]);
+                  editor.createShape({
+                    id: createShapeId(),
+                    type: "image",
+                    x: shape.x ?? 0,
+                    y: shape.y ?? 0,
+                    props: { w: shape.props.w ?? 600, h: shape.props.h ?? 400, assetId },
+                  } as any);
+                } else {
+                  editor.createShape({
+                    id: createShapeId(),
+                    type: shape.type,
+                    x: shape.x ?? 0,
+                    y: shape.y ?? 0,
+                    props: shape.props ?? {},
+                  } as any);
+                }
+              }
+              console.log(`[ForgeAI] Added ${shapes.length} shape(s) from AI agent`);
+            }
+          } catch {
+            // ignore poll errors
+          }
+          if (attempts >= maxAttempts) clearInterval(pollInterval);
+        }, 2000);
+      } catch {
+        // Silently fail
+      }
+    };
+
     globalThis.addEventListener("forge:open-shape-editor", handleOpenEditor);
     globalThis.addEventListener("forge:add-shape-comment", handleCommentForShape);
+    globalThis.addEventListener("forge:visualize-feature", handleVisualize);
     return () => {
       globalThis.removeEventListener("forge:open-shape-editor", handleOpenEditor);
       globalThis.removeEventListener("forge:add-shape-comment", handleCommentForShape);
+      globalThis.removeEventListener("forge:visualize-feature", handleVisualize);
     };
-  }, [createComment]);
+  }, [createComment, selectedBoardId]);
+
+  // Liveblocks real-time listener removed — shape delivery uses polling via /api/canvas-updates
 
   if (!selectedBoardId) {
     return (

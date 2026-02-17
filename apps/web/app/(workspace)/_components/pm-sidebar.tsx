@@ -64,6 +64,8 @@ export function PMSidebar() {
     expandedSections,
     toggleSection,
     setBoards,
+    setPRDs,
+    openPrdViewer,
   } = useWorkspaceStore();
 
   const [creatingBoard, setCreatingBoard] = useState(false);
@@ -73,6 +75,20 @@ export function PMSidebar() {
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    fetch(`/api/boards/${selectedBoardId}/prds`)
+      .then((res) => (res.ok ? res.json() : { prds: [] }))
+      .then((data) => setPRDs((data.prds ?? []).map((p: any) => ({
+        id: p.id,
+        boardId: p.boardId,
+        title: p.title,
+        status: p.status,
+        updatedAt: p.updatedAt,
+      }))))
+      .catch(() => {});
+  }, [selectedBoardId, setPRDs]);
 
   const handleCreateBoard = useCallback(async () => {
     if (!newBoardTitle.trim()) return;
@@ -372,6 +388,7 @@ export function PMSidebar() {
                           type="button"
                           onClick={() => {
                             if (isBoard) selectBoard(item.id);
+                            else if (key === "prds") openPrdViewer(item.id);
                           }}
                           className="flex-1 min-w-0 flex items-center gap-2.5 text-left cursor-pointer"
                           style={{ color: "inherit", fontWeight: "inherit" }}

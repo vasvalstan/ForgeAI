@@ -11,10 +11,13 @@ import {
   Sparkle,
   Paperclip,
   SidebarSimple,
+  FileText,
+  Wrench,
+  GitBranch,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 
-type AgentMode = "discovery" | "redhat" | "general";
+type AgentMode = "discovery" | "strategy" | "redhat" | "spec" | "engineering" | "general";
 
 interface ChatMessage {
   id: string;
@@ -40,11 +43,32 @@ const modes: {
     creditCost: 1,
   },
   {
+    key: "strategy",
+    label: "Strategy",
+    ModeIcon: FileText,
+    description: "Generate PRDs from insights",
+    creditCost: 3,
+  },
+  {
     key: "redhat",
     label: "Red Hat",
     ModeIcon: ShieldCheck,
     description: "Adversarial risk audit",
     creditCost: 5,
+  },
+  {
+    key: "spec",
+    label: "Spec",
+    ModeIcon: Wrench,
+    description: "Write technical specs",
+    creditCost: 3,
+  },
+  {
+    key: "engineering",
+    label: "Tasks",
+    ModeIcon: GitBranch,
+    description: "Break down into tasks",
+    creditCost: 2,
   },
   {
     key: "general",
@@ -55,6 +79,37 @@ const modes: {
   },
 ];
 
+type ContextAction = {
+  label: string;
+  mode: AgentMode;
+  description: string;
+};
+
+function getContextActions(selectedShapes: any[]): ContextAction[] {
+  if (!selectedShapes.length) return [];
+
+  const types = new Set(selectedShapes.map((s: any) => s.type));
+  const actions: ContextAction[] = [];
+
+  if (types.has("sticky-note")) {
+    actions.push({ label: "Generate PRD from selected insights", mode: "strategy", description: "Synthesize selected insights into a PRD" });
+  }
+  if (types.has("feature-card")) {
+    actions.push({ label: "Write spec for this feature", mode: "spec", description: "Generate a technical specification" });
+  }
+  if (types.has("spec-card")) {
+    actions.push({ label: "Break down into tasks", mode: "engineering", description: "Generate engineering tasks" });
+  }
+  if (types.has("prd-card")) {
+    actions.push({ label: "Run Red Hat audit on PRD", mode: "redhat", description: "Adversarial risk analysis" });
+  }
+  if (types.size > 0) {
+    actions.push({ label: "Audit selection for risks", mode: "redhat", description: "Check for contradictions and scope creep" });
+  }
+
+  return actions;
+}
+
 export function AgentPanel() {
   const {
     agentPanelCollapsed,
@@ -62,6 +117,7 @@ export function AgentPanel() {
     selectedBoardId,
     credits,
     setCredits,
+    setSelectedShapeIds,
   } = useWorkspaceStore();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -69,14 +125,32 @@ export function AgentPanel() {
       id: "welcome",
       role: "system",
       content:
-        "Welcome to ForgeAI. I can help you discover insights, audit your board for risks, or answer questions about your product strategy.",
+        "Welcome to ForgeAI. I can help you discover insights, generate PRDs, write specs, break down tasks, or audit your board.",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [agentMode, setAgentMode] = useState<AgentMode>("discovery");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [contextActions, setContextActions] = useState<ContextAction[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Listen for canvas selection changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const editor = (globalThis as any).__forgeEditor;
+      if (!editor) return;
+      try {
+        const selected = editor.getSelectedShapes();
+        const actions = getContextActions(selected);
+        setContextActions(actions);
+        setSelectedShapeIds(selected.map((s: any) => s.id));
+      } catch {
+        // Editor may not be ready
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [setSelectedShapeIds]);
 
   const dropAIReviewComment = useCallback((text: string) => {
     const editor = (globalThis as any).__forgeEditor;
@@ -162,11 +236,31 @@ export function AgentPanel() {
             sourceType: "notes",
           };
           break;
+        case "strategy":
+          endpoint = `${MOTIA_BASE}/generate-prd`;
+          body = {
+            boardId: selectedBoardId ?? "",
+          };
+          break;
         case "redhat":
           endpoint = `${MOTIA_BASE}/audit`;
           body = {
             boardId: selectedBoardId ?? "",
             shapes: getEditorShapes(),
+          };
+          break;
+        case "spec":
+          endpoint = `${MOTIA_BASE}/generate-spec`;
+          body = {
+            boardId: selectedBoardId ?? "",
+            featureTitle: userMessage.content,
+          };
+          break;
+        case "engineering":
+          endpoint = `${MOTIA_BASE}/break-down`;
+          body = {
+            boardId: selectedBoardId ?? "",
+            specTitle: userMessage.content,
           };
           break;
         case "general":
@@ -193,19 +287,19 @@ export function AgentPanel() {
         setCredits(credits - mode.creditCost);
       }
 
+      const modeMessages: Record<string, string> = {
+        discovery: `Discovery ${data.discoveryId ?? ""} is being analyzed. Insights will appear on the canvas shortly.`,
+        strategy: `PRD generation started. The document will appear on your canvas when ready.`,
+        redhat: `Audit complete. ${data.riskCount ?? 0} risks identified and flagged on the canvas.`,
+        spec: `Technical spec generation started. It will appear on your canvas when ready.`,
+        engineering: `Task breakdown started. Tasks will appear on your canvas when ready.`,
+        general: data.response ?? "Done.",
+      };
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          data.message ??
-          data.answer ??
-          `${mode.label} Agent processing complete. ${
-            agentMode === "discovery"
-              ? `Discovery ${data.discoveryId} is being analyzed. Insights will appear on the canvas shortly.`
-              : agentMode === "redhat"
-                ? `Audit complete. ${data.riskCount ?? 0} risks identified and flagged on the canvas.`
-                : data.response ?? "Done."
-          }`,
+        content: data.message ?? data.answer ?? `${mode.label} Agent processing complete. ${modeMessages[agentMode] ?? "Done."}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -290,15 +384,15 @@ export function AgentPanel() {
           </button>
         </div>
 
-        {/* Mode Tabs — with icons instead of just text */}
-        <div className="mt-4 flex items-center gap-2">
+        {/* Mode Tabs — compact grid for 6 agent modes */}
+        <div className="mt-4 grid grid-cols-3 gap-1.5">
           {modes.map((mode) => {
             const isActive = agentMode === mode.key;
             return (
               <button
                 key={mode.key}
                 onClick={() => setAgentMode(mode.key)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[12px] font-medium transition-all cursor-pointer"
+                className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all cursor-pointer"
                 style={
                   isActive
                     ? {
@@ -308,33 +402,48 @@ export function AgentPanel() {
                       }
                     : {
                         background: "transparent",
-                        border: "1px solid rgba(15, 23, 42, 0.12)",
+                        border: "1px solid rgba(15, 23, 42, 0.10)",
                         color: "#64748B",
                       }
                 }
+                title={`${mode.description} (${mode.creditCost}cr)`}
               >
-                <mode.ModeIcon size={14} />
+                <mode.ModeIcon size={13} />
                 {mode.label}
                 {mode.creditCost > 0 && (
-                  <span
-                    className="ml-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
-                    style={{
-                      background: isActive
-                        ? "rgba(37, 99, 235, 0.10)"
-                        : "rgba(15, 23, 42, 0.05)",
-                      border: isActive
-                        ? "1px solid rgba(37, 99, 235, 0.18)"
-                        : "1px solid rgba(15, 23, 42, 0.10)",
-                      color: isActive ? "#1D4ED8" : "#475569",
-                    }}
-                  >
-                    {mode.creditCost}cr
-                  </span>
+                  <span className="text-[9px] opacity-70">{mode.creditCost}cr</span>
                 )}
               </button>
             );
           })}
         </div>
+
+        {/* Context-aware quick actions based on canvas selection */}
+        {contextActions.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B", fontWeight: 600 }}>
+              Quick Actions
+            </div>
+            {contextActions.slice(0, 3).map((action, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setAgentMode(action.mode);
+                  setInput(action.label);
+                }}
+                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-left transition-all cursor-pointer"
+                style={{
+                  background: "rgba(124, 58, 237, 0.06)",
+                  border: "1px solid rgba(124, 58, 237, 0.15)",
+                  color: "#5B21B6",
+                }}
+              >
+                <Sparkle size={12} />
+                <span className="flex-1 truncate">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Messages */}
@@ -467,11 +576,14 @@ export function AgentPanel() {
                 }
               }}
               placeholder={
-                agentMode === "discovery"
-                  ? "Paste a transcript or describe what to analyze..."
-                  : agentMode === "redhat"
-                    ? "Ask me to audit your board for risks..."
-                    : "Ask anything about your product..."
+                ({
+                  discovery: "Paste a transcript or describe what to analyze...",
+                  strategy: "Generate a PRD from your board insights...",
+                  redhat: "Ask me to audit your board for risks...",
+                  spec: "Describe the feature to spec out...",
+                  engineering: "Which spec should I break into tasks?",
+                  general: "Ask anything about your product...",
+                } as Record<string, string>)[agentMode] ?? "Ask anything..."
               }
               className="w-full resize-none rounded-xl px-4 py-2.5 text-[13px] leading-5 outline-none transition-colors"
               style={{

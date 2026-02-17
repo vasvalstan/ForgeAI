@@ -1,35 +1,31 @@
-import { type Handlers, type StepConfig } from "motia";
+import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 
-export const config = {
+export const config: ApiRouteConfig = {
+  type: "api",
   name: "AskTrigger",
   description:
     "API trigger for the General Q&A Agent. Receives a question and enqueues analysis with board context.",
-  triggers: [
-    {
-      type: "api",
-      path: "/ask",
-      method: "POST",
-      bodySchema: z.object({
-        boardId: z.string(),
-        question: z.string(),
-        userId: z.string().optional(),
-      }),
-      responseSchema: {
-        200: z.object({
-          status: z.string(),
-          answer: z.string(),
-        }),
-      },
-    },
-  ],
-  enqueues: ["general.ask"],
+  path: "/ask",
+  method: "POST",
+  emits: ["general.ask"],
   flows: ["general-flow"],
-} as const satisfies StepConfig;
+  bodySchema: z.object({
+    boardId: z.string(),
+    question: z.string(),
+    userId: z.string().optional(),
+  }),
+  responseSchema: {
+    200: z.object({
+      status: z.string(),
+      answer: z.string(),
+    }),
+  },
+};
 
-export const handler: Handlers<typeof config> = async (
+export const handler: Handlers['AskTrigger'] = async (
   req,
-  { logger, enqueue }
+  { logger, emit }
 ) => {
   const { boardId, question } = req.body;
 
@@ -39,10 +35,7 @@ export const handler: Handlers<typeof config> = async (
   });
 
   // Enqueue the Python General Agent for async processing
-  await enqueue("general.ask", {
-    boardId,
-    question,
-  });
+  await emit({ topic: "general.ask", data: { boardId, question } });
 
   return {
     status: 200 as const,

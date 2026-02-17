@@ -19,7 +19,10 @@ from cuid2 import cuid_wrapper
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 
-from models import InsightCreate, DiscoveryCreate
+from models import (
+    InsightCreate, DiscoveryCreate, PRDCreate, SpecCreate, TaskCreate,
+    ConversationCreate, MessageCreate, MeetingNoteCreate,
+)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 POOL_MIN_CONN = int(os.environ.get("PG_POOL_MIN_CONN", "1"))
@@ -294,3 +297,254 @@ def get_board_insights(board_id: str) -> list[dict]:
             )
             rows = cur.fetchall()
             return [dict(row) for row in rows]
+
+
+def get_board_insights_by_ids(insight_ids: list[str]) -> list[dict]:
+    """Get insights by a list of IDs."""
+    if not insight_ids:
+        return []
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            placeholders = ",".join(["%s"] * len(insight_ids))
+            cur.execute(
+                f"""
+                SELECT id, "discoveryId", category, content, quote, sentiment
+                FROM "Insight"
+                WHERE id IN ({placeholders})
+                ORDER BY "createdAt" DESC
+                """,
+                tuple(insight_ids),
+            )
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+
+
+# ─── PRD Functions ───────────────────────────────────────
+
+def create_prd(data: PRDCreate) -> str:
+    """Create a new PRD record. Returns the ID."""
+    prd_id = generate_cuid()
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO "PRD" (id, "boardId", title, content, status, "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (prd_id, data.boardId, data.title, data.content, data.status, now, now),
+            )
+    return prd_id
+
+
+def get_prd(prd_id: str) -> Optional[dict]:
+    """Fetch a PRD by ID."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                'SELECT id, "boardId", title, content, status, "createdAt", "updatedAt" FROM "PRD" WHERE id = %s',
+                (prd_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def get_board_prds(board_id: str) -> list[dict]:
+    """Get all PRDs for a board."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, "boardId", title, content, status, "createdAt", "updatedAt"
+                FROM "PRD"
+                WHERE "boardId" = %s
+                ORDER BY "createdAt" DESC
+                """,
+                (board_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+
+
+# ─── Spec Functions ──────────────────────────────────────
+
+def create_spec(data: SpecCreate) -> str:
+    """Create a new Spec record. Returns the ID."""
+    spec_id = generate_cuid()
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO "Spec" (id, "boardId", "prdId", title, content, "shapeId", status, complexity, "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (spec_id, data.boardId, data.prdId, data.title, data.content, data.shapeId, data.status, data.complexity, now, now),
+            )
+    return spec_id
+
+
+def get_spec(spec_id: str) -> Optional[dict]:
+    """Fetch a Spec by ID."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                'SELECT id, "boardId", "prdId", title, content, "shapeId", status, complexity, "createdAt", "updatedAt" FROM "Spec" WHERE id = %s',
+                (spec_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def get_prd_specs(prd_id: str) -> list[dict]:
+    """Get all specs for a PRD."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, "boardId", "prdId", title, content, "shapeId", status, complexity, "createdAt", "updatedAt"
+                FROM "Spec"
+                WHERE "prdId" = %s
+                ORDER BY "createdAt" DESC
+                """,
+                (prd_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+
+
+def get_board_specs(board_id: str) -> list[dict]:
+    """Get all specs for a board."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, "boardId", "prdId", title, content, "shapeId", status, complexity, "createdAt", "updatedAt"
+                FROM "Spec"
+                WHERE "boardId" = %s
+                ORDER BY "createdAt" DESC
+                """,
+                (board_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+
+
+# ─── Task Functions ──────────────────────────────────────
+
+def create_tasks_batch(tasks: list[TaskCreate]) -> list[str]:
+    """Batch insert multiple tasks. Returns list of IDs."""
+    ids = []
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for data in tasks:
+                task_id = generate_cuid()
+                ids.append(task_id)
+                cur.execute(
+                    """
+                    INSERT INTO "Task" (id, "specId", title, description, complexity, status, "createdAt", "updatedAt")
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (task_id, data.specId, data.title, data.description, data.complexity, data.status, now, now),
+                )
+    return ids
+
+
+def get_spec_tasks(spec_id: str) -> list[dict]:
+    """Get all tasks for a spec."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, "specId", title, description, complexity, "githubIssueUrl", "githubIssueId", status, "createdAt", "updatedAt"
+                FROM "Task"
+                WHERE "specId" = %s
+                ORDER BY "createdAt" ASC
+                """,
+                (spec_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(row) for row in rows]
+
+
+def update_task_github(task_id: str, issue_url: str, issue_id: int) -> None:
+    """Update a task with its GitHub Issue URL and ID."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE "Task" SET "githubIssueUrl" = %s, "githubIssueId" = %s, "updatedAt" = %s WHERE id = %s',
+                (issue_url, issue_id, datetime.now(timezone.utc), task_id),
+            )
+
+
+# ─── Conversation Functions ──────────────────────────────
+
+def create_conversation(data: ConversationCreate) -> str:
+    """Create a new conversation. Returns the ID."""
+    conv_id = generate_cuid()
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO "Conversation" (id, "boardId", title, "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (conv_id, data.boardId, data.title, now, now),
+            )
+    return conv_id
+
+
+def create_message(data: MessageCreate) -> str:
+    """Create a new message in a conversation. Returns the ID."""
+    msg_id = generate_cuid()
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO "Message" (id, "conversationId", role, content, status, "createdAt")
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (msg_id, data.conversationId, data.role, data.content, data.status, now),
+            )
+    return msg_id
+
+
+def get_board_github(board_id: str) -> Optional[dict]:
+    """Get GitHub connection info for a board."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                'SELECT "githubRepo", "githubToken" FROM "Board" WHERE id = %s',
+                (board_id,),
+            )
+            row = cur.fetchone()
+            if row and row.get("githubRepo"):
+                return dict(row)
+            return None
+
+
+# ─── Meeting Note Functions ──────────────────────────────
+
+def create_meeting_note(data: MeetingNoteCreate) -> str:
+    """Create a new meeting note. Returns the ID."""
+    note_id = generate_cuid()
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO "MeetingNote" (id, "boardId", title, content, "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (note_id, data.boardId, data.title, data.content, now, now),
+            )
+    return note_id

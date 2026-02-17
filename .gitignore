@@ -40,6 +40,10 @@ coverage/
 .DS_Store
 *.pem
 
+# motia
+apps/backend/.motia/
+apps/backend/python_modules/
+
 # prisma
 packages/db/prisma/*.db
 packages/db/prisma/*.db-journal

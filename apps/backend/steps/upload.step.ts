@@ -1,46 +1,42 @@
-import { type Handlers, type StepConfig } from "motia";
+import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 import { db } from "@forge/db";
 
-export const config = {
+export const config: ApiRouteConfig = {
+  type: "api",
   name: "UploadTranscript",
   description:
     "Receives a transcript file upload, creates a Discovery record in Postgres, and triggers the Discovery Agent",
-  triggers: [
-    {
-      type: "api",
-      path: "/discover",
-      method: "POST",
-      bodySchema: z.object({
-        boardId: z.string(),
-        content: z.string(),
-        sourceType: z
-          .enum(["transcript", "audio", "notes"])
-          .default("transcript"),
-        fileName: z.string().optional(),
-        userId: z.string().optional(),
-      }),
-      responseSchema: {
-        200: z.object({
-          discoveryId: z.string(),
-          status: z.string(),
-          message: z.string(),
-        }),
-        402: z.object({
-          error: z.string(),
-        }),
-      },
-    },
-  ],
-  enqueues: ["discovery.analyze"],
+  path: "/discover",
+  method: "POST",
+  emits: ["discovery.analyze"],
   flows: ["discovery-flow"],
-} as const satisfies StepConfig;
+  bodySchema: z.object({
+    boardId: z.string(),
+    content: z.string(),
+    sourceType: z
+      .enum(["transcript", "audio", "notes", "meeting_notes"])
+      .default("transcript"),
+    fileName: z.string().optional(),
+    userId: z.string().optional(),
+  }),
+  responseSchema: {
+    200: z.object({
+      discoveryId: z.string(),
+      status: z.string(),
+      message: z.string(),
+    }),
+    402: z.object({
+      error: z.string(),
+    }),
+  },
+};
 
 const DISCOVERY_CREDIT_COST = 1;
 
-export const handler: Handlers<typeof config> = async (
+export const handler: Handlers['UploadTranscript'] = async (
   req,
-  { logger, enqueue }
+  { logger, emit }
 ) => {
   const { boardId, content, sourceType, fileName, userId } = req.body;
 
@@ -99,6 +95,18 @@ export const handler: Handlers<typeof config> = async (
     }
   }
 
+  // If meeting notes, also create a MeetingNote record
+  if (sourceType === "meeting_notes") {
+    await db.meetingNote.create({
+      data: {
+        boardId,
+        title: fileName ?? `Meeting Notes — ${new Date().toLocaleDateString()}`,
+        content,
+      },
+    });
+    logger.info("MeetingNote record created", { boardId });
+  }
+
   // Create Discovery record in Postgres via Prisma
   const discovery = await db.discovery.create({
     data: {
@@ -115,10 +123,14 @@ export const handler: Handlers<typeof config> = async (
   });
 
   // Enqueue the Python Discovery Agent
-  await enqueue("discovery.analyze", {
-    discoveryId: discovery.id,
-    boardId,
-    content,
+  await emit({
+    topic: "discovery.analyze",
+    data: {
+      discoveryId: discovery.id,
+      boardId,
+      content,
+      sourceType,
+    },
   });
 
   logger.info("Discovery analysis enqueued", {

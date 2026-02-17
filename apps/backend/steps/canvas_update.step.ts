@@ -1,18 +1,14 @@
-import { type Handlers, type StepConfig } from "motia";
+import { EventConfig, Handlers } from "motia";
 
-export const config = {
+export const config: EventConfig = {
+  type: "event",
   name: "CanvasUpdate",
   description:
     "Bridge between AI agents and the Tldraw canvas via Liveblocks REST API",
-  triggers: [
-    {
-      type: "queue",
-      topic: "canvas.update",
-    },
-  ],
-  enqueues: [],
-  flows: ["discovery-flow", "audit-flow"],
-} as const satisfies StepConfig;
+  subscribes: ["canvas.update"],
+  emits: [],
+  flows: ["discovery-flow", "audit-flow", "prd-flow", "spec-flow", "task-flow", "mock-flow"],
+};
 
 interface CanvasShape {
   type: string;
@@ -33,8 +29,12 @@ interface CanvasUpdateEvent {
   }>;
 }
 
+const AUDIT_SHAPE_TYPES = new Set(["risk-flag"]);
+const ANIMATED_SHAPE_TYPES = new Set(["risk-flag"]);
+
 const LIVEBLOCKS_API = "https://api.liveblocks.io/v2";
 const LIVEBLOCKS_SECRET = process.env.LIVEBLOCKS_SECRET_KEY ?? "";
+const NEXT_PUBLIC_URL = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 50;
 const RISK_FLAG_ANIMATION_STEP_MS = 45;
@@ -60,15 +60,41 @@ async function getLiveblocksRoomId(boardId: string): Promise<string> {
   }
 }
 
+async function ensureRoomExists(roomId: string, logger: any): Promise<void> {
+  const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}`;
+  try {
+    const check = await fetch(url, {
+      headers: { Authorization: `Bearer ${LIVEBLOCKS_SECRET}` },
+    });
+    if (check.status === 404) {
+      const create = await fetch(`${LIVEBLOCKS_API}/rooms`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LIVEBLOCKS_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: roomId, defaultAccesses: [] }),
+      });
+      if (create.ok) {
+        logger.info(`Created Liveblocks room: ${roomId}`);
+      } else {
+        logger.warn(`Failed to create room ${roomId}: ${create.status}`);
+      }
+    }
+  } catch (err: any) {
+    logger.warn(`Room check failed: ${err.message}`);
+  }
+}
+
 async function sendShapesToLiveblocks(
   roomId: string,
   action: CanvasUpdateEvent["action"],
   shapes: CanvasShape[],
   logger: any
 ): Promise<void> {
-  // Use Liveblocks Storage REST API to broadcast shape data
-  // The frontend listens for these events and creates the Tldraw shapes
-  const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}/broadcast`;
+  await ensureRoomExists(roomId, logger);
+
+  const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}/broadcast_event`;
   const effectiveBatchSize = action === "explosion" ? Math.max(shapes.length, 1) : BATCH_SIZE;
   const effectiveBatchDelayMs = action === "explosion" ? 0 : BATCH_DELAY_MS;
 
@@ -131,9 +157,8 @@ async function sendShapesToLiveblocks(
   }
 }
 
-export const handler: Handlers<typeof config> = async (data, { logger }) => {
-  const event = data as unknown as CanvasUpdateEvent;
-  const { boardId, action, shapes, connections } = event;
+export const handler: Handlers['CanvasUpdate'] = async (input, { logger }) => {
+  const { boardId, action, shapes, connections } = input as unknown as CanvasUpdateEvent;
 
   logger.info(`Canvas update: ${action} for board ${boardId}`, {
     shapeCount: shapes.length,
@@ -149,7 +174,7 @@ export const handler: Handlers<typeof config> = async (data, { logger }) => {
   // Send connections as a separate broadcast event
   if (connections && connections.length > 0) {
     try {
-      const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}/broadcast`;
+      const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}/broadcast_event`;
       await fetch(url, {
         method: "POST",
         headers: {
@@ -165,6 +190,31 @@ export const handler: Handlers<typeof config> = async (data, { logger }) => {
     } catch (err: any) {
       logger.error(`Connection broadcast failed: ${err.message}`);
     }
+  }
+
+  // Direct push to Next.js API (reliable fallback that doesn't depend on Liveblocks WebSocket)
+  try {
+    const enrichedShapes = shapes.map((shape, idx) => ({
+      id: `shape-${Date.now()}-${idx}`,
+      type: shape.type,
+      x: shape.x,
+      y: shape.y,
+      props: shape.props,
+    }));
+
+    const pushRes = await fetch(`${NEXT_PUBLIC_URL}/api/canvas-updates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId, shapes: enrichedShapes }),
+    });
+
+    if (pushRes.ok) {
+      logger.info(`Pushed ${shapes.length} shapes to Next.js for board ${boardId}`);
+    } else {
+      logger.warn(`Next.js push returned ${pushRes.status}`);
+    }
+  } catch (err: any) {
+    logger.warn(`Next.js push failed: ${err.message}`);
   }
 
   logger.info(

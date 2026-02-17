@@ -6,6 +6,7 @@ import { PMSidebar } from "./_components/pm-sidebar";
 import { CanvasPanel } from "./_components/canvas-panel";
 import { AgentPanel } from "./_components/agent-panel";
 import { SourceViewer } from "./_components/source-viewer";
+import { PRDPanel } from "./_components/prd-panel";
 
 export default function WorkspaceLayout({
   children,
@@ -65,8 +66,9 @@ export default function WorkspaceLayout({
         <AgentPanel />
       </div>
 
-      {/* Source Viewer Slide-over */}
+      {/* Slide-over Panels */}
       <SourceViewer />
+      <PRDPanel />
     </div>
   );
 }

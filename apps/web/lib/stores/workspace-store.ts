@@ -30,6 +30,7 @@ export interface PRDItem {
   id: string;
   boardId: string;
   title: string;
+  status: string;
   updatedAt: string;
 }
 
@@ -38,6 +39,25 @@ export interface MeetingNoteItem {
   boardId: string;
   title: string;
   updatedAt: string;
+}
+
+export interface SpecItem {
+  id: string;
+  boardId: string;
+  prdId?: string;
+  title: string;
+  status: string;
+  complexity?: string;
+  updatedAt: string;
+}
+
+export interface TaskItem {
+  id: string;
+  specId: string;
+  title: string;
+  status: string;
+  complexity?: string;
+  githubIssueUrl?: string;
 }
 
 type TreeSection = "boards" | "prds" | "transcripts" | "notes" | "insights";
@@ -67,8 +87,22 @@ interface WorkspaceState {
   sourceDiscoveryId: string | null;
   sourceHighlight: { start: number; end: number } | null;
 
+  // PRD viewer
+  prdViewerOpen: boolean;
+  selectedPrdId: string | null;
+
   // Credits
   credits: number;
+
+  // Canvas selection tracking
+  selectedShapeIds: string[];
+
+  // GitHub
+  githubConnected: boolean;
+
+  // Extra data
+  specs: SpecItem[];
+  tasks: TaskItem[];
 
   // Actions
   selectBoard: (boardId: string | null) => void;
@@ -82,9 +116,15 @@ interface WorkspaceState {
   setInsights: (insights: InsightItem[]) => void;
   setPRDs: (prds: PRDItem[]) => void;
   setMeetingNotes: (notes: MeetingNoteItem[]) => void;
+  setSpecs: (specs: SpecItem[]) => void;
+  setTasks: (tasks: TaskItem[]) => void;
   setCredits: (credits: number) => void;
+  setSelectedShapeIds: (ids: string[]) => void;
+  setGithubConnected: (connected: boolean) => void;
   openSourceViewer: (discoveryId: string, start: number, end: number) => void;
   closeSourceViewer: () => void;
+  openPrdViewer: (prdId: string) => void;
+  closePrdViewer: () => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -102,7 +142,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   sourceViewerOpen: false,
   sourceDiscoveryId: null,
   sourceHighlight: null,
+  prdViewerOpen: false,
+  selectedPrdId: null,
   credits: 100,
+  selectedShapeIds: [],
+  githubConnected: false,
+  specs: [],
+  tasks: [],
 
   selectBoard: (boardId) =>
     set({ selectedBoardId: boardId, selectedDiscoveryId: null }),
@@ -137,7 +183,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setInsights: (insights) => set({ insights }),
   setPRDs: (prds) => set({ prds }),
   setMeetingNotes: (notes) => set({ meetingNotes: notes }),
+  setSpecs: (specs) => set({ specs }),
+  setTasks: (tasks) => set({ tasks }),
   setCredits: (credits) => set({ credits }),
+  setSelectedShapeIds: (ids) => set({ selectedShapeIds: ids }),
+  setGithubConnected: (connected) => set({ githubConnected: connected }),
 
   openSourceViewer: (discoveryId, start, end) =>
     set({
@@ -151,5 +201,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       sourceViewerOpen: false,
       sourceDiscoveryId: null,
       sourceHighlight: null,
+    }),
+
+  openPrdViewer: (prdId) =>
+    set({
+      prdViewerOpen: true,
+      selectedPrdId: prdId,
+    }),
+
+  closePrdViewer: () =>
+    set({
+      prdViewerOpen: false,
+      selectedPrdId: null,
     }),
 }));

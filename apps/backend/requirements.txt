@@ -17,3 +17,6 @@ langsmith>=0.3.0
 
 # Numerical operations (vector handling)
 numpy>=2.0.0
+
+# HTTP client (Prodia mock generation)
+requests>=2.32.0

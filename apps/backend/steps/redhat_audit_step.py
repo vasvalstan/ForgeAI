@@ -11,26 +11,24 @@ Enqueues: "canvas.update" with risk flag positions
 
 import json
 import os
+import sys
 from typing import Any
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import anthropic
 import openai
 from langsmith import traceable
 
-from db import find_similar_insights, get_board_insights
+from db import find_similar_insights, get_board_insights, get_board_github
 from models import InsightRead
 
-# Motia step config
 config = {
+    "type": "event",
     "name": "RedHatAuditAgent",
     "description": "Scans canvas shapes for risks, contradictions, and technical infeasibility",
-    "triggers": [
-        {
-            "type": "queue",
-            "topic": "redhat.audit",
-        }
-    ],
-    "enqueues": ["canvas.update"],
+    "subscribes": ["redhat.audit"],
+    "emits": ["canvas.update"],
     "flows": ["audit-flow"],
 }
 
@@ -59,6 +57,11 @@ Look for:
 - Technical debt risks (features that imply large-scope rewrites)
 - Market risks (features that don't address validated pain points)
 - Dependency risks (features that depend on unvalidated assumptions)
+
+If GitHub repository context is provided, also assess:
+- Technical feasibility based on the actual codebase structure and schema
+- Whether proposed features conflict with existing data models
+- Whether the team's recent PRs suggest bandwidth for the proposed scope
 
 Be specific and reference the actual content of the shapes. Do NOT be generic.
 Return a JSON array of risk objects."""
@@ -94,6 +97,7 @@ async def audit_with_claude(
     shapes: list[dict],
     similar_insights: list[dict],
     ctx: Any,
+    github_context: str = "",
 ) -> list[dict]:
     """Use Claude to perform adversarial risk analysis."""
     try:
@@ -130,6 +134,10 @@ async def audit_with_claude(
                 indent=2,
             )
 
+        repo_context = ""
+        if github_context:
+            repo_context = f"\n\nCodebase Context:{github_context}"
+
         response = client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=4096,
@@ -137,7 +145,7 @@ async def audit_with_claude(
             messages=[
                 {
                     "role": "user",
-                    "content": f"Audit the following product discovery board:\n\nCurrent shapes:\n{shapes_summary}{historical_summary}",
+                    "content": f"Audit the following product discovery board:\n\nCurrent shapes:\n{shapes_summary}{historical_summary}{repo_context}",
                 }
             ],
         )
@@ -227,9 +235,7 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
     board_id = data.get("boardId", "")
     shapes = data.get("shapes", [])
 
-    ctx.logger.info(f"Red Hat auditing board: {board_id}", extra={
-        "shapeCount": len(shapes),
-    })
+    ctx.logger.info(f"Red Hat auditing board: {board_id} shapeCount: {len(shapes)}")
 
     # Step 1: Generate context embedding for similarity search
     context_embedding = get_embedding_for_context(shapes, ctx)
@@ -246,10 +252,26 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
         except Exception as e:
             ctx.logger.warn(f"pgvector search failed: {e}")
 
-    # Step 3: Audit with Claude
-    risks = await audit_with_claude(shapes, similar_insights, ctx)
+    # Step 2.5: Fetch GitHub repo context if connected
+    github_context = ""
+    try:
+        github_info = get_board_github(board_id)
+        if github_info:
+            from github_context import fetch_file_tree, fetch_key_files, fetch_recent_prs
+            repo = github_info["githubRepo"]
+            token = github_info["githubToken"]
+            tree = fetch_file_tree(repo, token)
+            key_files = fetch_key_files(repo, token)
+            recent_prs = fetch_recent_prs(repo, token)
+            github_context = f"\n\nGitHub Repository: {repo}\n\nFile Structure:\n{tree}\n\nKey Files:\n{key_files}\n\nRecent PRs:\n{recent_prs}"
+            ctx.logger.info(f"Fetched GitHub context for {repo}")
+    except Exception as e:
+        ctx.logger.warn(f"GitHub context fetch failed: {e}")
 
-    ctx.logger.info(f"Found {len(risks)} risks", extra={"boardId": board_id})
+    # Step 3: Audit with Claude
+    risks = await audit_with_claude(shapes, similar_insights, ctx, github_context=github_context)
+
+    ctx.logger.info(f"Found {len(risks)} risks for board: {board_id}")
 
     if risks:
         # Position risk flags near their target shapes
@@ -281,10 +303,10 @@ async def handler(data: dict[str, Any], ctx: Any) -> None:
                 },
             })
 
-        await ctx.enqueue("canvas.update", {
+        await ctx.emit({"topic": "canvas.update", "data": {
             "boardId": board_id,
             "action": "audit",
             "shapes": risk_shapes,
-        })
+        }})
 
     ctx.logger.info(f"Red Hat audit complete for board {board_id}")

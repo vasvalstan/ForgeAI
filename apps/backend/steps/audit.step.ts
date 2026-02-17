@@ -1,50 +1,46 @@
-import { type Handlers, type StepConfig } from "motia";
+import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 import { db } from "@forge/db";
 
-export const config = {
+export const config: ApiRouteConfig = {
+  type: "api",
   name: "AuditTrigger",
   description:
     "API trigger for the Red Hat Audit Agent. Receives canvas shapes and enqueues adversarial analysis.",
-  triggers: [
-    {
-      type: "api",
-      path: "/audit",
-      method: "POST",
-      bodySchema: z.object({
-        boardId: z.string(),
-        shapes: z.array(
-          z.object({
-            id: z.string().optional(),
-            type: z.string(),
-            x: z.number().optional(),
-            y: z.number().optional(),
-            props: z.record(z.unknown()),
-          })
-        ),
-        userId: z.string().optional(),
-      }),
-      responseSchema: {
-        200: z.object({
-          status: z.string(),
-          message: z.string(),
-          riskCount: z.number().optional(),
-        }),
-        402: z.object({
-          error: z.string(),
-        }),
-      },
-    },
-  ],
-  enqueues: ["redhat.audit"],
+  path: "/audit",
+  method: "POST",
+  emits: ["redhat.audit"],
   flows: ["audit-flow"],
-} as const satisfies StepConfig;
+  bodySchema: z.object({
+    boardId: z.string(),
+    shapes: z.array(
+      z.object({
+        id: z.string().optional(),
+        type: z.string(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        props: z.record(z.unknown()),
+      })
+    ),
+    userId: z.string().optional(),
+  }),
+  responseSchema: {
+    200: z.object({
+      status: z.string(),
+      message: z.string(),
+      riskCount: z.number().optional(),
+    }),
+    402: z.object({
+      error: z.string(),
+    }),
+  },
+};
 
 const AUDIT_CREDIT_COST = 5;
 
-export const handler: Handlers<typeof config> = async (
+export const handler: Handlers['AuditTrigger'] = async (
   req,
-  { logger, enqueue }
+  { logger, emit }
 ) => {
   const { boardId, shapes, userId } = req.body;
 
@@ -98,10 +94,7 @@ export const handler: Handlers<typeof config> = async (
   }
 
   // Enqueue the Python Red Hat Audit Agent
-  await enqueue("redhat.audit", {
-    boardId,
-    shapes,
-  });
+  await emit({ topic: "redhat.audit", data: { boardId, shapes } });
 
   logger.info("Red Hat audit enqueued", { boardId });
 

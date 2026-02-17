@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Liveblocks } from "@liveblocks/node";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { getPresenceColor } from "@/lib/liveblocks";
+import { getPresenceColor } from "@/lib/liveblocks-client";
 
 const liveblocks = new Liveblocks({
   secret: process.env.LIVEBLOCKS_SECRET_KEY!,
