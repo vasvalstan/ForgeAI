@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   SquaresFour,
@@ -68,6 +68,11 @@ export function PMSidebar() {
 
   const [creatingBoard, setCreatingBoard] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState("");
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const handleCreateBoard = useCallback(async () => {
     if (!newBoardTitle.trim()) return;
@@ -383,43 +388,55 @@ export function PMSidebar() {
                           <span className="truncate">{item.label}</span>
                         </button>
                         {/* Triple-dot overflow menu on hover */}
-                        <DropdownMenu.Root>
-                          <DropdownMenu.Trigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Open item menu"
-                              className="opacity-0 group-hover/item:opacity-100 p-0.5 rounded transition-opacity cursor-pointer hover:bg-black/5"
-                              style={{ color: "#64748B" }}
-                            >
-                              <DotsThree size={14} />
-                            </button>
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.Content
-                              sideOffset={4}
-                              align="end"
-                              className="min-w-[140px] rounded-lg p-1 text-xs"
-                              style={{
-                                background: "#FFFFFF",
-                                border: "1px solid rgba(15, 23, 42, 0.12)",
-                                boxShadow: "0 14px 40px rgba(15, 23, 42, 0.16)",
-                                color: "#0F172A",
-                                zIndex: 50,
-                              }}
-                            >
-                              <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
-                                Rename
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
-                                Duplicate
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Separator className="my-1 h-px" style={{ background: "rgba(15, 23, 42, 0.08)" }} />
-                              <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors" style={{ color: "#EF4444" }}>
-                                Delete
-                              </DropdownMenu.Item>
-                            </DropdownMenu.Content>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
+                        {hasMounted ? (
+                          <DropdownMenu.Root>
+                            <DropdownMenu.Trigger asChild>
+                              <button
+                                type="button"
+                                aria-label="Open item menu"
+                                className="opacity-0 group-hover/item:opacity-100 p-0.5 rounded transition-opacity cursor-pointer hover:bg-black/5"
+                                style={{ color: "#64748B" }}
+                              >
+                                <DotsThree size={14} />
+                              </button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                              <DropdownMenu.Content
+                                sideOffset={4}
+                                align="end"
+                                className="min-w-[140px] rounded-lg p-1 text-xs"
+                                style={{
+                                  background: "#FFFFFF",
+                                  border: "1px solid rgba(15, 23, 42, 0.12)",
+                                  boxShadow: "0 14px 40px rgba(15, 23, 42, 0.16)",
+                                  color: "#0F172A",
+                                  zIndex: 50,
+                                }}
+                              >
+                                <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
+                                  Rename
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
+                                  Duplicate
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Separator className="my-1 h-px" style={{ background: "rgba(15, 23, 42, 0.08)" }} />
+                                <DropdownMenu.Item className="px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors" style={{ color: "#EF4444" }}>
+                                  Delete
+                                </DropdownMenu.Item>
+                              </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                          </DropdownMenu.Root>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label="Item menu loading"
+                            disabled
+                            className="opacity-0 group-hover/item:opacity-100 p-0.5 rounded transition-opacity"
+                            style={{ color: "#64748B" }}
+                          >
+                            <DotsThree size={14} />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -465,58 +482,82 @@ export function PMSidebar() {
         </div>
 
         {/* Account card with settings popover */}
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer hover:bg-black/[0.03]"
-            >
-              <div
-                className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{ background: "rgba(15, 23, 42, 0.04)" }}
+        {hasMounted ? (
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer hover:bg-black/[0.03]"
               >
-                <UserCircle size={18} style={{ color: "#64748B" }} />
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="text-[12px] font-medium truncate" style={{ color: "#0F172A" }}>
-                  My Workspace
+                <div
+                  className="w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: "rgba(15, 23, 42, 0.04)" }}
+                >
+                  <UserCircle size={18} style={{ color: "#64748B" }} />
                 </div>
-                <div className="text-[10px] truncate" style={{ color: "#64748B" }}>
-                  Free plan
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-[12px] font-medium truncate" style={{ color: "#0F172A" }}>
+                    My Workspace
+                  </div>
+                  <div className="text-[10px] truncate" style={{ color: "#64748B" }}>
+                    Free plan
+                  </div>
                 </div>
-              </div>
-              <GearSix size={14} style={{ color: "#64748B" }} />
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              sideOffset={6}
-              side="top"
-              align="start"
-              className="min-w-[200px] rounded-lg p-1.5 text-xs"
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid rgba(15, 23, 42, 0.12)",
-                boxShadow: "0 14px 40px rgba(15, 23, 42, 0.16)",
-                color: "#0F172A",
-                zIndex: 50,
-              }}
+                <GearSix size={14} style={{ color: "#64748B" }} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                sideOffset={6}
+                side="top"
+                align="start"
+                className="min-w-[200px] rounded-lg p-1.5 text-xs"
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(15, 23, 42, 0.12)",
+                  boxShadow: "0 14px 40px rgba(15, 23, 42, 0.16)",
+                  color: "#0F172A",
+                  zIndex: 50,
+                }}
+              >
+                <DropdownMenu.Label className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider" style={{ color: "#64748B" }}>
+                  Account
+                </DropdownMenu.Label>
+                <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
+                  <GearSix size={14} /> Settings
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
+                  <CreditCard size={14} /> Billing
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator className="my-1 h-px" style={{ background: "rgba(15, 23, 42, 0.08)" }} />
+                <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors" style={{ color: "#EF4444" }}>
+                  <SignOut size={14} /> Sign out
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors"
+          >
+            <div
+              className="w-7 h-7 rounded-md flex items-center justify-center"
+              style={{ background: "rgba(15, 23, 42, 0.04)" }}
             >
-              <DropdownMenu.Label className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider" style={{ color: "#64748B" }}>
-                Account
-              </DropdownMenu.Label>
-              <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
-                <GearSix size={14} /> Settings
-              </DropdownMenu.Item>
-              <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors">
-                <CreditCard size={14} /> Billing
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator className="my-1 h-px" style={{ background: "rgba(15, 23, 42, 0.08)" }} />
-              <DropdownMenu.Item className="flex items-center gap-2 px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-black/5 transition-colors" style={{ color: "#EF4444" }}>
-                <SignOut size={14} /> Sign out
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+              <UserCircle size={18} style={{ color: "#64748B" }} />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="text-[12px] font-medium truncate" style={{ color: "#0F172A" }}>
+                My Workspace
+              </div>
+              <div className="text-[10px] truncate" style={{ color: "#64748B" }}>
+                Free plan
+              </div>
+            </div>
+            <GearSix size={14} style={{ color: "#64748B" }} />
+          </button>
+        )}
       </div>
     </div>
   );

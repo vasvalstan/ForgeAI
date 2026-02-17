@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createShapeId } from "tldraw";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   MagnifyingGlass,
@@ -76,6 +77,27 @@ export function AgentPanel() {
   const [agentMode, setAgentMode] = useState<AgentMode>("discovery");
   const [isProcessing, setIsProcessing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const dropAIReviewComment = useCallback((text: string) => {
+    const editor = (globalThis as any).__forgeEditor;
+    if (!editor || !text.trim()) return;
+
+    const center = editor.getViewportScreenCenter();
+    editor.createShape({
+      id: createShapeId(),
+      type: "comment",
+      x: center.x - 120,
+      y: center.y - 70,
+      props: {
+        w: 240,
+        h: 140,
+        text: text.slice(0, 260),
+        author: "AI Review",
+        authorColor: "#7C3AED",
+        targetShapeId: "",
+      },
+    } as any);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -187,6 +209,10 @@ export function AgentPanel() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      if (agentMode === "redhat" || agentMode === "general") {
+        dropAIReviewComment(assistantMessage.content);
+      }
     } catch {
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -206,6 +232,7 @@ export function AgentPanel() {
     credits,
     setCredits,
     getEditorShapes,
+    dropAIReviewComment,
   ]);
 
   if (agentPanelCollapsed) {

@@ -9,9 +9,12 @@ import {
   TLShape,
   resizeBox,
 } from "tldraw";
+import type { MouseEvent } from "react";
 import type { Icon } from "@phosphor-icons/react";
 import {
+  ChatCircleDotsIcon,
   InfoIcon,
+  PencilSimpleIcon,
   PushPinIcon,
   QuestionIcon,
   ShieldWarningIcon,
@@ -36,6 +39,7 @@ declare module "tldraw" {
       sentiment: number;
       insightId: string;
       source: string; // JSON: { discoveryId, startOffset, endOffset }
+      comments?: string; // JSON array of inline comments
     };
     "feature-card": {
       w: number;
@@ -43,12 +47,22 @@ declare module "tldraw" {
       title: string;
       description: string;
       priority: string;
+      comments?: string; // JSON array of inline comments
     };
     "risk-flag": {
       w: number;
       h: number;
       severity: string;
       reasoning: string;
+      targetShapeId: string;
+      comments?: string; // JSON array of inline comments
+    };
+    "comment": {
+      w: number;
+      h: number;
+      text: string;
+      author: string;
+      authorColor: string;
       targetShapeId: string;
     };
   }
@@ -59,6 +73,13 @@ declare module "tldraw" {
 type StickyNoteShape = TLShape<"sticky-note">;
 type FeatureCardShape = TLShape<"feature-card">;
 type RiskFlagShape = TLShape<"risk-flag">;
+type CommentShape = TLShape<"comment">;
+type InlineComment = {
+  id: string;
+  text: string;
+  author: string;
+  authorColor: string;
+};
 
 // ─── Color Helpers (high-utility light cards) ───────────────
 
@@ -272,6 +293,186 @@ const SEVERITY_ICON_MAP: Record<string, Icon> = {
   low: InfoIcon,
 };
 
+type SourcePayload = {
+  discoveryId: string;
+  startOffset: number;
+  endOffset: number;
+};
+
+function parseSourcePayload(source: string): SourcePayload | null {
+  if (!source) return null;
+  try {
+    const parsed = JSON.parse(source) as {
+      discoveryId?: unknown;
+      startOffset?: unknown;
+      endOffset?: unknown;
+    };
+    if (typeof parsed.discoveryId !== "string" || !parsed.discoveryId) {
+      return null;
+    }
+    const start =
+      typeof parsed.startOffset === "number" && Number.isFinite(parsed.startOffset)
+        ? Math.max(0, Math.floor(parsed.startOffset))
+        : 0;
+    const end =
+      typeof parsed.endOffset === "number" && Number.isFinite(parsed.endOffset)
+        ? Math.max(start, Math.floor(parsed.endOffset))
+        : start;
+    return {
+      discoveryId: parsed.discoveryId,
+      startOffset: start,
+      endOffset: end,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseInlineComments(raw: string): InlineComment[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((c) => c && typeof c.text === "string")
+      .map((c) => ({
+        id: typeof c.id === "string" ? c.id : `c-${Date.now()}`,
+        text: String(c.text),
+        author: typeof c.author === "string" && c.author ? c.author : "Anonymous",
+        authorColor:
+          typeof c.authorColor === "string" && c.authorColor ? c.authorColor : "#7C3AED",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function promptForTextUpdate(currentValue: string, title: string): string | null {
+  const next = globalThis.prompt(title, currentValue);
+  if (next === null) return null;
+  return next.trim();
+}
+
+type ShapeEditEventDetail = {
+  shapeId: string;
+  shapeType: string;
+  mode: "insight" | "feature" | "risk" | "comment";
+  value: string;
+  anchorX: number;
+  anchorY: number;
+};
+
+type ShapeCommentEventDetail = {
+  shapeId: string;
+  shapeType: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  anchorX: number;
+  anchorY: number;
+};
+
+function emitOpenShapeEditor(
+  e: MouseEvent<HTMLButtonElement>,
+  detail: Omit<ShapeEditEventDetail, "anchorX" | "anchorY">
+) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  globalThis.dispatchEvent(
+    new CustomEvent<ShapeEditEventDetail>("forge:open-shape-editor", {
+      detail: {
+        ...detail,
+        anchorX: rect.right + 10,
+        anchorY: rect.top,
+      },
+    })
+  );
+}
+
+function emitAddShapeComment(
+  e: MouseEvent<HTMLButtonElement>,
+  detail: Omit<ShapeCommentEventDetail, "anchorX" | "anchorY">
+) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  globalThis.dispatchEvent(
+    new CustomEvent<ShapeCommentEventDetail>("forge:add-shape-comment", {
+      detail: {
+        ...detail,
+        anchorX: rect.right + 10,
+        anchorY: rect.top,
+      },
+    })
+  );
+}
+
+function EditChip({
+  onClick,
+  title = "Edit",
+}: Readonly<{
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+}>) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(e);
+      }}
+      style={{
+        width: "22px",
+        height: "22px",
+        borderRadius: "8px",
+        border: `1px solid ${CARD_BASE.borderSubtle}`,
+        background: "rgba(15, 23, 42, 0.03)",
+        color: CARD_BASE.textDim,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+      }}
+    >
+      <PencilSimpleIcon size={12} />
+    </button>
+  );
+}
+
+function CommentChip({
+  onClick,
+  title = "Add comment",
+}: Readonly<{
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+}>) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(e);
+      }}
+      style={{
+        width: "22px",
+        height: "22px",
+        borderRadius: "8px",
+        border: `1px solid ${CARD_BASE.borderSubtle}`,
+        background: "rgba(15, 23, 42, 0.03)",
+        color: CARD_BASE.textDim,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+      }}
+    >
+      <ChatCircleDotsIcon size={12} />
+    </button>
+  );
+}
+
 // ─── Sticky Note Shape Util (White card + status dot) ───────
 
 export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
@@ -286,6 +487,7 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
     sentiment: T.number,
     insightId: T.string,
     source: T.string,
+    comments: T.optional(T.string),
   };
 
   getDefaultProps(): StickyNoteShape["props"] {
@@ -298,6 +500,7 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
       sentiment: 0,
       insightId: "",
       source: "",
+      comments: "[]",
     };
   }
 
@@ -315,6 +518,17 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
   component(shape: StickyNoteShape) {
     const colors = getCategoryColors(shape.props.category);
     const CategoryIcon = CATEGORY_ICON_MAP[shape.props.category] ?? QuestionIcon;
+    const sourcePayload = parseSourcePayload(shape.props.source);
+    const inlineComments = parseInlineComments(shape.props.comments ?? "[]");
+    const editInsightText = () => {
+      const next = promptForTextUpdate(shape.props.text, "Edit insight");
+      if (next === null) return;
+      this.editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        props: { ...shape.props, text: next },
+      });
+    };
 
     return (
       <HTMLContainer
@@ -325,6 +539,10 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
         }}
       >
         <div
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            editInsightText();
+          }}
           style={{
             width: "100%",
             height: "100%",
@@ -378,18 +596,53 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
                 {colors.label}
               </span>
             </div>
-            <span
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: colors.dotColor,
-              }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  background: colors.dotColor,
+                }}
+              />
+              <CommentChip
+                title="Comment on this insight"
+                onClick={(e) =>
+                  emitAddShapeComment(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    x: shape.x,
+                    y: shape.y,
+                    w: shape.props.w,
+                    h: shape.props.h,
+                  })
+                }
+              />
+              <EditChip
+                title="Edit insight text"
+                onClick={(e) =>
+                  emitOpenShapeEditor(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    mode: "insight",
+                    value: shape.props.text,
+                  })
+                }
+              />
+            </div>
           </div>
 
           {/* Body text */}
           <div
+            onDoubleClickCapture={(e) => {
+              // Capture on the text node itself so Tldraw selection handling
+              // does not swallow the edit interaction.
+              e.stopPropagation();
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              editInsightText();
+            }}
             style={{
               flex: 1,
               fontSize: "13px",
@@ -404,27 +657,7 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
 
           {/* Quote block */}
           {shape.props.quote && (
-            <button
-              type="button"
-              disabled={!shape.props.source}
-              onClick={() => {
-                if (shape.props.source) {
-                  try {
-                    const sourceData = JSON.parse(shape.props.source);
-                    globalThis.dispatchEvent(
-                      new CustomEvent("forge:open-source", {
-                        detail: {
-                          discoveryId: sourceData.discoveryId,
-                          startOffset: sourceData.startOffset,
-                          endOffset: sourceData.endOffset,
-                        },
-                      })
-                    );
-                  } catch {
-                    // Invalid source JSON — ignore
-                  }
-                }
-              }}
+            <div
               style={{
                 borderRadius: "12px",
                 background: "rgba(15, 23, 42, 0.03)",
@@ -433,15 +666,110 @@ export class StickyNoteShapeUtil extends ShapeUtil<StickyNoteShape> {
                 fontSize: "12px",
                 color: CARD_BASE.textSecondary,
                 lineHeight: "1.4",
-                cursor: shape.props.source ? "pointer" : "default",
                 textAlign: "left",
                 width: "100%",
-                opacity: shape.props.source ? 1 : 0.7,
               }}
-              title={shape.props.source ? "Click to view source transcript" : undefined}
             >
               &ldquo;{shape.props.quote}&rdquo;
-            </button>
+              <div
+                style={{
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "8px",
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={!sourcePayload}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!sourcePayload) return;
+                    globalThis.dispatchEvent(
+                      new CustomEvent("forge:open-source", {
+                        detail: {
+                          discoveryId: sourcePayload.discoveryId,
+                          startOffset: sourcePayload.startOffset,
+                          endOffset: sourcePayload.endOffset,
+                        },
+                      })
+                    );
+                  }}
+                  style={{
+                    fontSize: "11px",
+                    color: sourcePayload ? "#1D4ED8" : CARD_BASE.textDim,
+                    border: "none",
+                    background: "transparent",
+                    cursor: sourcePayload ? "pointer" : "default",
+                    padding: 0,
+                  }}
+                >
+                  View source
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) =>
+                    emitAddShapeComment(e, {
+                      shapeId: shape.id,
+                      shapeType: shape.type,
+                      x: shape.x,
+                      y: shape.y,
+                      w: shape.props.w,
+                      h: shape.props.h,
+                    })
+                  }
+                  style={{
+                    fontSize: "11px",
+                    color: "#1D4ED8",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: 0,
+                    fontWeight: 600,
+                  }}
+                >
+                  Add comment below
+                </button>
+              </div>
+            </div>
+          )}
+
+          {inlineComments.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {inlineComments.slice(-2).map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    borderRadius: "10px",
+                    border: `1px solid ${CARD_BASE.borderSubtle}`,
+                    background: "rgba(15, 23, 42, 0.02)",
+                    padding: "6px 8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: c.authorColor,
+                      marginBottom: "2px",
+                    }}
+                  >
+                    {c.author}
+                  </div>
+                  <div style={{ fontSize: "11px", color: CARD_BASE.textSecondary, lineHeight: 1.35 }}>
+                    {c.text}
+                  </div>
+                </div>
+              ))}
+              {inlineComments.length > 2 && (
+                <div style={{ fontSize: "10px", color: CARD_BASE.textDim }}>
+                  +{inlineComments.length - 2} more comments
+                </div>
+              )}
+            </div>
           )}
         </div>
       </HTMLContainer>
@@ -464,6 +792,7 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
     title: T.string,
     description: T.string,
     priority: T.string,
+    comments: T.optional(T.string),
   };
 
   getDefaultProps(): FeatureCardShape["props"] {
@@ -473,6 +802,7 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
       title: "New Feature",
       description: "",
       priority: "medium",
+      comments: "[]",
     };
   }
 
@@ -489,10 +819,31 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
 
   component(shape: FeatureCardShape) {
     const colors = getPriorityColors(shape.props.priority);
+    const inlineComments = parseInlineComments(shape.props.comments ?? "[]");
+    const editFeatureCard = () => {
+      const initial = `${shape.props.title}\n\n${shape.props.description}`;
+      const updated = promptForTextUpdate(initial, "Edit feature card (title + blank line + description)");
+      if (updated === null) return;
+      const [nextTitle, ...rest] = updated.split("\n");
+      const nextDescription = rest.join("\n").trim();
+      this.editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        props: {
+          ...shape.props,
+          title: (nextTitle || shape.props.title).trim(),
+          description: nextDescription,
+        },
+      });
+    };
 
     return (
       <HTMLContainer style={{ width: "100%", height: "100%", pointerEvents: "all" }}>
         <div
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            editFeatureCard();
+          }}
           style={{
             width: "100%",
             height: "100%",
@@ -525,9 +876,35 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
             >
               {shape.props.priority}
             </span>
-            <span style={{ color: CARD_BASE.textDim }}>
-              <PushPinIcon size={16} />
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: CARD_BASE.textDim }}>
+                <PushPinIcon size={16} />
+              </span>
+              <CommentChip
+                title="Comment on this feature"
+                onClick={(e) =>
+                  emitAddShapeComment(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    x: shape.x,
+                    y: shape.y,
+                    w: shape.props.w,
+                    h: shape.props.h,
+                  })
+                }
+              />
+              <EditChip
+                title="Edit feature card"
+                onClick={(e) =>
+                  emitOpenShapeEditor(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    mode: "feature",
+                    value: `${shape.props.title}\n\n${shape.props.description}`,
+                  })
+                }
+              />
+            </div>
           </div>
 
           {/* Title */}
@@ -555,6 +932,25 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
           >
             {shape.props.description}
           </div>
+
+          {inlineComments.length > 0 && (
+            <div
+              style={{
+                borderTop: `1px solid ${CARD_BASE.borderSubtle}`,
+                paddingTop: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "5px",
+              }}
+            >
+              {inlineComments.slice(-2).map((c) => (
+                <div key={c.id} style={{ fontSize: "11px", color: colors.descText, lineHeight: 1.35 }}>
+                  <span style={{ color: c.authorColor, fontWeight: 600 }}>{c.author}: </span>
+                  {c.text}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </HTMLContainer>
     );
@@ -562,6 +958,123 @@ export class FeatureCardShapeUtil extends ShapeUtil<FeatureCardShape> {
 
   indicator(shape: FeatureCardShape) {
     return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
+  }
+}
+
+// ─── Comment Shape Util (Lightweight pinned discussion bubble) ───────
+
+export class CommentShapeUtil extends ShapeUtil<CommentShape> {
+  static override readonly type = "comment" as const;
+
+  static override readonly props: RecordProps<CommentShape> = {
+    w: T.number,
+    h: T.number,
+    text: T.string,
+    author: T.string,
+    authorColor: T.string,
+    targetShapeId: T.string,
+  };
+
+  getDefaultProps(): CommentShape["props"] {
+    return {
+      w: 220,
+      h: 120,
+      text: "",
+      author: "Anonymous",
+      authorColor: "#7C3AED",
+      targetShapeId: "",
+    };
+  }
+
+  getGeometry(shape: CommentShape): Geometry2d {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true });
+  }
+
+  override canEdit() { return true; }
+  override canResize() { return true; }
+
+  override onResize(shape: any, info: TLResizeInfo<any>) {
+    return resizeBox(shape, info);
+  }
+
+  component(shape: CommentShape) {
+    const editComment = () => {
+      const next = promptForTextUpdate(shape.props.text, "Edit comment");
+      if (next === null) return;
+      this.editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        props: { ...shape.props, text: next },
+      });
+    };
+
+    return (
+      <HTMLContainer style={{ width: "100%", height: "100%", pointerEvents: "all" }}>
+        <div
+          className="glass animate-fade-up"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            editComment();
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "12px",
+            border: `1px solid ${CARD_BASE.border}`,
+            borderLeft: `4px solid ${shape.props.authorColor || "#7C3AED"}`,
+            padding: "10px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            boxShadow: "0 4px 12px rgba(15, 23, 42, 0.08)",
+            fontFamily: "var(--font-sans)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <ChatCircleDotsIcon size={14} style={{ color: shape.props.authorColor || "#7C3AED" }} />
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#64748B",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {shape.props.author || "Anonymous"}
+              </span>
+            </div>
+            <EditChip
+              title="Edit comment"
+              onClick={(e) =>
+                emitOpenShapeEditor(e, {
+                  shapeId: shape.id,
+                  shapeType: shape.type,
+                  mode: "comment",
+                  value: shape.props.text,
+                })
+              }
+            />
+          </div>
+          <div
+            style={{
+              flex: 1,
+              fontSize: "12px",
+              color: "#0F172A",
+              lineHeight: "1.4",
+              overflow: "hidden",
+            }}
+          >
+            {shape.props.text || "Type feedback..."}
+          </div>
+        </div>
+      </HTMLContainer>
+    );
+  }
+
+  indicator(shape: CommentShape) {
+    return <rect width={shape.props.w} height={shape.props.h} rx={12} ry={12} />;
   }
 }
 
@@ -576,6 +1089,7 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
     severity: T.string,
     reasoning: T.string,
     targetShapeId: T.string,
+    comments: T.optional(T.string),
   };
 
   getDefaultProps(): RiskFlagShape["props"] {
@@ -585,6 +1099,7 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
       severity: "medium",
       reasoning: "",
       targetShapeId: "",
+      comments: "[]",
     };
   }
 
@@ -602,10 +1117,37 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
   component(shape: RiskFlagShape) {
     const colors = getSeverityColors(shape.props.severity);
     const SeverityIcon = SEVERITY_ICON_MAP[shape.props.severity] ?? ShieldWarningIcon;
+    const meta = (shape.meta ?? {}) as {
+      entryAnimation?: unknown;
+      entryAnimationAt?: unknown;
+      entryAnimationDelayMs?: unknown;
+    };
+    const hasRecentEntryAnimation =
+      meta.entryAnimation === "fade-up" &&
+      typeof meta.entryAnimationAt === "number" &&
+      Date.now() - meta.entryAnimationAt < 4000;
+    const entryDelayMs =
+      typeof meta.entryAnimationDelayMs === "number"
+        ? Math.max(0, Math.min(600, meta.entryAnimationDelayMs))
+        : 0;
+    const inlineComments = parseInlineComments(shape.props.comments ?? "[]");
+    const editRiskReasoning = () => {
+      const next = promptForTextUpdate(shape.props.reasoning, "Edit risk reasoning");
+      if (next === null) return;
+      this.editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        props: { ...shape.props, reasoning: next },
+      });
+    };
 
     return (
       <HTMLContainer style={{ width: "100%", height: "100%", pointerEvents: "all" }}>
         <div
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            editRiskReasoning();
+          }}
           style={{
             width: "100%",
             height: "100%",
@@ -619,6 +1161,9 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
             gap: "10px",
             fontFamily: "var(--font-sans)",
             boxShadow: CARD_BASE.shadow,
+            animation: hasRecentEntryAnimation
+              ? `fade-up 300ms ease-out ${entryDelayMs}ms both`
+              : undefined,
           }}
         >
           {/* Header */}
@@ -657,14 +1202,40 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
                 {shape.props.severity} Risk
               </span>
             </div>
-            <span
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: colors.dotColor,
-              }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  background: colors.dotColor,
+                }}
+              />
+              <CommentChip
+                title="Comment on this risk"
+                onClick={(e) =>
+                  emitAddShapeComment(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    x: shape.x,
+                    y: shape.y,
+                    w: shape.props.w,
+                    h: shape.props.h,
+                  })
+                }
+              />
+              <EditChip
+                title="Edit risk reasoning"
+                onClick={(e) =>
+                  emitOpenShapeEditor(e, {
+                    shapeId: shape.id,
+                    shapeType: shape.type,
+                    mode: "risk",
+                    value: shape.props.reasoning,
+                  })
+                }
+              />
+            </div>
           </div>
 
           {/* Reasoning */}
@@ -679,6 +1250,25 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
           >
             {shape.props.reasoning}
           </div>
+
+          {inlineComments.length > 0 && (
+            <div
+              style={{
+                borderTop: `1px solid ${CARD_BASE.borderSubtle}`,
+                paddingTop: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "5px",
+              }}
+            >
+              {inlineComments.slice(-2).map((c) => (
+                <div key={c.id} style={{ fontSize: "11px", color: CARD_BASE.textSecondary, lineHeight: 1.35 }}>
+                  <span style={{ color: c.authorColor, fontWeight: 600 }}>{c.author}: </span>
+                  {c.text}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </HTMLContainer>
     );

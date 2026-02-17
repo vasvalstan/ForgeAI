@@ -1,5 +1,16 @@
 [
   {
+    "id": "dev-ebbzHzgh",
+    "title": "test",
+    "liveblocksRoomId": "forge-room-h9qbBZ_5yM9M",
+    "ownerId": "dev-user",
+    "updatedAt": "2026-02-17T15:18:21.435Z",
+    "createdAt": "2026-02-17T15:18:21.435Z",
+    "_count": {
+      "discoveries": 0
+    }
+  },
+  {
     "id": "dev-hytrvNQw",
     "title": "Pricing Strategy Map",
     "liveblocksRoomId": "forge-room-rEdtUVA8vVhT",

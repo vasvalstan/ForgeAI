@@ -8,35 +8,69 @@ sync with the Prisma schema (packages/db/prisma/schema.prisma).
 Uses connection pooling and parameterized queries to prevent SQL injection.
 """
 
+import atexit
 import os
-import json
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from threading import Lock
 from typing import Optional
-from datetime import datetime
 
-import psycopg2
-from psycopg2.extras import RealDictCursor, execute_values
+from cuid2 import cuid_wrapper
+from psycopg2.extras import RealDictCursor
+from psycopg2.pool import SimpleConnectionPool
 
 from models import InsightCreate, DiscoveryCreate
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+POOL_MIN_CONN = int(os.environ.get("PG_POOL_MIN_CONN", "1"))
+POOL_MAX_CONN = int(os.environ.get("PG_POOL_MAX_CONN", "5"))
 
-# CUID-compatible ID generation (matches Prisma's @default(cuid()))
-import random
-import string
-import time
+if POOL_MIN_CONN < 1 or POOL_MAX_CONN < 1 or POOL_MIN_CONN > POOL_MAX_CONN:
+    raise ValueError("Invalid pool sizes: ensure 1 <= PG_POOL_MIN_CONN <= PG_POOL_MAX_CONN")
+
+
+_pool_lock = Lock()
+_pool: Optional[SimpleConnectionPool] = None
+_cuid2_generator = cuid_wrapper()
+
+
+def _get_pool() -> SimpleConnectionPool:
+    """Lazily initialize and return the shared PostgreSQL connection pool."""
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                if not DATABASE_URL:
+                    raise ValueError("DATABASE_URL is required for PostgreSQL operations")
+                _pool = SimpleConnectionPool(
+                    minconn=POOL_MIN_CONN,
+                    maxconn=POOL_MAX_CONN,
+                    dsn=DATABASE_URL,
+                )
+    return _pool
+
+
+def _close_pool() -> None:
+    """Close all pooled connections on process shutdown."""
+    global _pool
+    if _pool is not None:
+        _pool.closeall()
+        _pool = None
+
+
+atexit.register(_close_pool)
+
 
 def generate_cuid() -> str:
-    """Generate a CUID-like identifier matching Prisma's default."""
-    timestamp = hex(int(time.time() * 1000))[2:]
-    random_part = ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))
-    return f"c{timestamp}{random_part}"
+    """Generate a CUID2 identifier."""
+    return _cuid2_generator()
 
 
 @contextmanager
 def get_connection():
-    """Get a database connection with auto-commit and cleanup."""
-    conn = psycopg2.connect(DATABASE_URL)
+    """Borrow a pooled connection with auto-commit and cleanup."""
+    pool = _get_pool()
+    conn = pool.getconn()
     try:
         yield conn
         conn.commit()
@@ -44,7 +78,7 @@ def get_connection():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        pool.putconn(conn)
 
 
 def get_board(board_id: str) -> Optional[dict]:
@@ -86,7 +120,7 @@ def deduct_credits(user_id: str, amount: int) -> bool:
 def create_discovery(data: DiscoveryCreate) -> str:
     """Create a new Discovery record. Returns the ID."""
     discovery_id = data.id or generate_cuid()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -106,7 +140,7 @@ def update_discovery_status(discovery_id: str, status: str) -> None:
         with conn.cursor() as cur:
             cur.execute(
                 'UPDATE "Discovery" SET status = %s, "updatedAt" = %s WHERE id = %s',
-                (status, datetime.utcnow(), discovery_id)
+                (status, datetime.now(timezone.utc), discovery_id)
             )
 
 
@@ -125,7 +159,7 @@ def get_discovery(discovery_id: str) -> Optional[dict]:
 def create_insight(data: InsightCreate) -> str:
     """Create a new Insight with optional pgvector embedding."""
     insight_id = generate_cuid()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -163,7 +197,7 @@ def create_insight(data: InsightCreate) -> str:
 def create_insights_batch(insights: list[InsightCreate]) -> list[str]:
     """Batch insert multiple insights for efficiency."""
     ids = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     with get_connection() as conn:
         with conn.cursor() as cur:

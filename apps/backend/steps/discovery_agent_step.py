@@ -13,6 +13,7 @@ import json
 import math
 import os
 import random
+import re
 from typing import Any
 
 import anthropic
@@ -70,8 +71,13 @@ def compute_spatial_layout(
 ) -> list[dict]:
     """
     Compute force-directed spatial positions for insights.
-    Groups by category and arranges in clusters with organic spacing.
+    Groups by category anchors but allows semantically similar notes to pull together.
     """
+    if not insights:
+        return []
+
+    card_w = 260
+    card_h = 180
     category_positions = {
         "pain_point": (-300, -200),
         "feature_request": (300, -200),
@@ -79,26 +85,131 @@ def compute_spatial_layout(
         "question": (300, 200),
     }
 
-    positioned = []
-    category_counts: dict[str, int] = {}
+    def tokenize(text: str) -> set[str]:
+        stop_words = {
+            "the", "a", "an", "is", "are", "to", "in", "of", "and", "it",
+            "for", "on", "that", "this", "with", "was", "were", "from",
+            "they", "have", "has", "had", "you", "your", "our", "their",
+        }
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        return {t for t in tokens if len(t) > 2 and t not in stop_words}
 
+    token_sets = [tokenize(ins.get("content", "")) for ins in insights]
+
+    # Build semantic attraction edges from keyword overlap.
+    # This keeps related ideas near each other without rigid grid placement.
+    attraction_edges: list[tuple[int, int, float]] = []
+    for i in range(len(insights)):
+        for j in range(i + 1, len(insights)):
+            overlap = len(token_sets[i] & token_sets[j])
+            if overlap >= 2:
+                attraction_edges.append((i, j, min(1.0, overlap / 6.0)))
+
+    # Initial positions around category anchors with jitter.
+    positions: list[list[float]] = []
+    velocities: list[list[float]] = []
     for insight in insights:
         cat = insight.get("category", "question")
-        count = category_counts.get(cat, 0)
-        category_counts[cat] = count + 1
+        anchor_x, anchor_y = category_positions.get(cat, (0, 0))
+        angle = random.uniform(0, math.tau)
+        radius = random.uniform(60, 180)
+        x = canvas_center[0] + anchor_x + math.cos(angle) * radius
+        y = canvas_center[1] + anchor_y + math.sin(angle) * radius
+        positions.append([x, y])
+        velocities.append([0.0, 0.0])
 
-        base_x, base_y = category_positions.get(cat, (0, 0))
-        col = count % 3
-        row = count // 3
-        x = canvas_center[0] + base_x + col * 280 + random.randint(-20, 20)
-        y = canvas_center[1] + base_y + row * 200 + random.randint(-20, 20)
+    repulsion = 26000.0
+    anchor_strength = 0.03
+    attraction_strength = 0.05
+    target_edge_len = 240.0
+    damping = 0.82
+    max_step = 24.0
+    min_x, max_x = canvas_center[0] - 900, canvas_center[0] + 900
+    min_y, max_y = canvas_center[1] - 700, canvas_center[1] + 700
 
+    iterations = 70
+    n = len(insights)
+    for _ in range(iterations):
+        forces = [[0.0, 0.0] for _ in range(n)]
+
+        # Pairwise repulsion to avoid overlap.
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx = positions[j][0] - positions[i][0]
+                dy = positions[j][1] - positions[i][1]
+                dist_sq = dx * dx + dy * dy + 1.0
+                dist = math.sqrt(dist_sq)
+                force = repulsion / dist_sq
+                fx = force * dx / dist
+                fy = force * dy / dist
+                forces[i][0] -= fx
+                forces[i][1] -= fy
+                forces[j][0] += fx
+                forces[j][1] += fy
+
+        # Pull nodes toward category anchors.
+        for i, insight in enumerate(insights):
+            cat = insight.get("category", "question")
+            anchor_x, anchor_y = category_positions.get(cat, (0, 0))
+            target_x = canvas_center[0] + anchor_x
+            target_y = canvas_center[1] + anchor_y
+            forces[i][0] += (target_x - positions[i][0]) * anchor_strength
+            forces[i][1] += (target_y - positions[i][1]) * anchor_strength
+
+        # Pull semantically similar notes together.
+        for i, j, weight in attraction_edges:
+            dx = positions[j][0] - positions[i][0]
+            dy = positions[j][1] - positions[i][1]
+            dist = math.sqrt(dx * dx + dy * dy) + 1e-6
+            stretch = dist - target_edge_len
+            force = attraction_strength * weight * stretch
+            fx = force * dx / dist
+            fy = force * dy / dist
+            forces[i][0] += fx
+            forces[i][1] += fy
+            forces[j][0] -= fx
+            forces[j][1] -= fy
+
+        # Integrate velocity + position with damping.
+        for i in range(n):
+            velocities[i][0] = (velocities[i][0] + forces[i][0]) * damping
+            velocities[i][1] = (velocities[i][1] + forces[i][1]) * damping
+
+            step = math.hypot(velocities[i][0], velocities[i][1])
+            if step > max_step:
+                scale = max_step / step
+                velocities[i][0] *= scale
+                velocities[i][1] *= scale
+
+            positions[i][0] = max(min_x, min(max_x, positions[i][0] + velocities[i][0]))
+            positions[i][1] = max(min_y, min(max_y, positions[i][1] + velocities[i][1]))
+
+    # Small overlap resolution pass for dense boards.
+    desired_gap = 230.0
+    for _ in range(4):
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx = positions[j][0] - positions[i][0]
+                dy = positions[j][1] - positions[i][1]
+                dist = math.hypot(dx, dy) + 1e-6
+                if dist >= desired_gap:
+                    continue
+                push = (desired_gap - dist) * 0.5
+                nx = dx / dist
+                ny = dy / dist
+                positions[i][0] -= nx * push
+                positions[i][1] -= ny * push
+                positions[j][0] += nx * push
+                positions[j][1] += ny * push
+
+    positioned = []
+    for i, insight in enumerate(insights):
         positioned.append({
             **insight,
-            "x": x,
-            "y": y,
-            "w": 260,
-            "h": 180,
+            "x": round(positions[i][0]),
+            "y": round(positions[i][1]),
+            "w": card_w,
+            "h": card_h,
         })
 
     return positioned

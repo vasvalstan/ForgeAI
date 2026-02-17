@@ -1,5 +1,4 @@
 import { type Handlers, type StepConfig } from "motia";
-import { z } from "zod";
 
 export const config = {
   name: "CanvasUpdate",
@@ -38,6 +37,8 @@ const LIVEBLOCKS_API = "https://api.liveblocks.io/v2";
 const LIVEBLOCKS_SECRET = process.env.LIVEBLOCKS_SECRET_KEY ?? "";
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 50;
+const RISK_FLAG_ANIMATION_STEP_MS = 45;
+const RISK_FLAG_ANIMATION_MAX_DELAY_MS = 300;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,15 +62,19 @@ async function getLiveblocksRoomId(boardId: string): Promise<string> {
 
 async function sendShapesToLiveblocks(
   roomId: string,
+  action: CanvasUpdateEvent["action"],
   shapes: CanvasShape[],
   logger: any
 ): Promise<void> {
   // Use Liveblocks Storage REST API to broadcast shape data
   // The frontend listens for these events and creates the Tldraw shapes
   const url = `${LIVEBLOCKS_API}/rooms/${encodeURIComponent(roomId)}/broadcast`;
+  const effectiveBatchSize = action === "explosion" ? Math.max(shapes.length, 1) : BATCH_SIZE;
+  const effectiveBatchDelayMs = action === "explosion" ? 0 : BATCH_DELAY_MS;
 
-  for (let i = 0; i < shapes.length; i += BATCH_SIZE) {
-    const batch = shapes.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < shapes.length; i += effectiveBatchSize) {
+    const batch = shapes.slice(i, i + effectiveBatchSize);
+    const broadcastAt = Date.now();
 
     try {
       const response = await fetch(url, {
@@ -89,18 +94,30 @@ async function sendShapesToLiveblocks(
               rotation: 0,
               isLocked: false,
               props: shape.props,
+              ...(action === "audit" && shape.type === "risk-flag"
+                ? {
+                    meta: {
+                      entryAnimation: "fade-up",
+                      entryAnimationDelayMs: Math.min(
+                        (i + idx) * RISK_FLAG_ANIMATION_STEP_MS,
+                        RISK_FLAG_ANIMATION_MAX_DELAY_MS
+                      ),
+                      entryAnimationAt: broadcastAt,
+                    },
+                  }
+                : {}),
             })),
           },
         }),
       });
 
-      if (!response.ok) {
-        logger.warn(
-          `Liveblocks broadcast batch ${Math.floor(i / BATCH_SIZE) + 1} returned ${response.status}`
+      if (response.ok) {
+        logger.info(
+          `Batch ${Math.floor(i / effectiveBatchSize) + 1}: ${batch.length} shapes broadcast to room ${roomId}`
         );
       } else {
-        logger.info(
-          `Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} shapes broadcast to room ${roomId}`
+        logger.warn(
+          `Liveblocks broadcast batch ${Math.floor(i / effectiveBatchSize) + 1} returned ${response.status}`
         );
       }
     } catch (err: any) {
@@ -108,8 +125,8 @@ async function sendShapesToLiveblocks(
     }
 
     // Delay between batches to avoid canvas flicker
-    if (i + BATCH_SIZE < shapes.length) {
-      await sleep(BATCH_DELAY_MS);
+    if (i + effectiveBatchSize < shapes.length) {
+      await sleep(effectiveBatchDelayMs);
     }
   }
 }
@@ -127,7 +144,7 @@ export const handler: Handlers<typeof config> = async (data, { logger }) => {
   const roomId = await getLiveblocksRoomId(boardId);
 
   // Push shapes to Liveblocks in batches
-  await sendShapesToLiveblocks(roomId, shapes, logger);
+  await sendShapesToLiveblocks(roomId, action, shapes, logger);
 
   // Send connections as a separate broadcast event
   if (connections && connections.length > 0) {
