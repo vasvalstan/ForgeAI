@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "ForgeAI — Spatial Intelligence OS",
@@ -22,24 +29,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@200,300,400,500,600,700&f[]=satoshi@300,400,500,600,700&display=swap"
-        />
-      </head>
+    <html lang="en" className={inter.variable}>
       <body className="antialiased">
         <Toaster
           position="bottom-right"
-          theme="dark"
+          theme="light"
           toastOptions={{
             style: {
-              background: "rgba(11, 16, 32, 0.9)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              backdropFilter: "blur(20px)",
-              color: "#F1F5F9",
-              fontFamily: "Satoshi, Inter, system-ui, sans-serif",
+              background: "rgba(255, 255, 255, 0.95)",
+              border: "1px solid rgba(15, 23, 42, 0.12)",
+              backdropFilter: "blur(14px)",
+              color: "#0F172A",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
             },
           }}
         />

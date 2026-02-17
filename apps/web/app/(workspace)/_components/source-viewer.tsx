@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { FileText, X } from "@phosphor-icons/react";
 
 export function SourceViewer() {
   const {
@@ -27,9 +28,9 @@ export function SourceViewer() {
       }
     };
 
-    window.addEventListener("forge:open-source", handleOpenSource);
+    globalThis.addEventListener("forge:open-source", handleOpenSource);
     return () => {
-      window.removeEventListener("forge:open-source", handleOpenSource);
+      globalThis.removeEventListener("forge:open-source", handleOpenSource);
     };
   }, []);
 
@@ -71,11 +72,11 @@ export function SourceViewer() {
         <span>{before}</span>
         <mark
           style={{
-            background: "rgba(0, 217, 255, 0.3)",
-            color: "#F1F5F9",
+            background: "rgba(37, 99, 235, 0.20)",
+            color: "#0F172A",
             padding: "2px 4px",
             borderRadius: "4px",
-            border: "1px solid rgba(0, 217, 255, 0.5)",
+            border: "1px solid rgba(37, 99, 235, 0.35)",
           }}
         >
           {highlighted}
@@ -91,36 +92,26 @@ export function SourceViewer() {
       style={{ width: 480 }}
     >
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+      <button
+        type="button"
+        aria-label="Close source viewer"
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm"
         onClick={closeSourceViewer}
       />
 
       {/* Panel */}
       <div
-        className="relative ml-auto h-full flex flex-col"
+        className="relative ml-auto h-full flex flex-col glass shadow-panel"
         style={{
           width: 480,
-          background: "rgba(7, 10, 18, 0.98)",
-          borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
+          background: "rgba(255, 255, 255, 0.96)",
+          borderLeft: "1px solid var(--color-forge-border)",
         }}
       >
         {/* Header */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-forge-border/30 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#00D9FF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
+            <FileText size={16} style={{ color: "var(--color-brand-500)" }} />
             <h3 className="text-sm font-semibold text-forge-text">
               Source Transcript
             </h3>
@@ -129,16 +120,7 @@ export function SourceViewer() {
             onClick={closeSourceViewer}
             className="p-1.5 rounded-lg hover:bg-forge-surface-2 transition-colors text-forge-text-muted hover:text-forge-text cursor-pointer"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            <X size={16} />
           </button>
         </div>
 
@@ -161,8 +143,8 @@ export function SourceViewer() {
             </div>
           ) : (
             <div
-              className="text-sm leading-relaxed text-forge-text-muted whitespace-pre-wrap"
-              style={{ fontFamily: "Satoshi, Inter, monospace" }}
+              className="text-sm leading-relaxed text-forge-text whitespace-pre-wrap"
+              style={{ fontFamily: "Inter, system-ui, sans-serif" }}
             >
               {renderHighlightedContent()}
             </div>

@@ -9,6 +9,7 @@ import {
 } from "@/lib/canvas/shapes";
 import { AISidebar } from "./_components/ai-sidebar";
 import { DiscoveryDropZone } from "./_components/discovery-drop-zone";
+import { Sparkle } from "@phosphor-icons/react";
 
 const customShapeUtils = [StickyNoteShapeUtil, FeatureCardShapeUtil, RiskFlagShapeUtil];
 
@@ -98,19 +99,7 @@ export default function BoardPage({ params }: BoardPageProps) {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="glass rounded-xl px-4 py-2.5 text-sm font-medium text-forge-text hover:bg-forge-surface-2 transition-all duration-200 flex items-center gap-2 cursor-pointer"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8Z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
+            <Sparkle size={16} style={{ color: "var(--color-brand-500)" }} />
             AI Agent
           </button>
         </div>

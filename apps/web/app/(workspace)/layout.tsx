@@ -46,7 +46,7 @@ export default function WorkspaceLayout({
       {/* Left Panel — PM Sidebar */}
       <div
         className="flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden border-r"
-        style={{ width: sidebarCollapsed ? 48 : 320, borderColor: "rgba(255,255,255,0.1)" }}
+        style={{ width: sidebarCollapsed ? 48 : 300, borderColor: "rgba(15, 23, 42, 0.08)" }}
       >
         <PMSidebar />
       </div>
@@ -60,7 +60,7 @@ export default function WorkspaceLayout({
       {/* Right Panel — AI Agents */}
       <div
         className="flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden border-l"
-        style={{ width: agentPanelCollapsed ? 48 : 360, borderColor: "rgba(255,255,255,0.1)" }}
+        style={{ width: agentPanelCollapsed ? 48 : 340, borderColor: "rgba(15, 23, 42, 0.08)" }}
       >
         <AgentPanel />
       </div>

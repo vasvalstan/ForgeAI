@@ -9,6 +9,7 @@ import {
 } from "@/lib/canvas/shapes";
 import { DiscoveryDropZone } from "./discovery-drop-zone";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { SquaresFour } from "@phosphor-icons/react";
 
 const customShapeUtils = [
   StickyNoteShapeUtil,
@@ -98,33 +99,22 @@ export function CanvasPanel() {
   if (!selectedBoardId) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-sm">
           <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6"
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
             style={{
               background:
-                "linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(96, 165, 250, 0.1))",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+                "linear-gradient(135deg, rgba(124, 58, 237, 0.10), rgba(37, 99, 235, 0.08))",
+              border: "1px solid rgba(15, 23, 42, 0.10)",
             }}
           >
-            <svg
-              width="36"
-              height="36"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#00D9FF"
-              strokeWidth="1.5"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
+            <SquaresFour size={28} style={{ color: "var(--color-primary-500)" }} />
           </div>
           <h2
-            className="text-2xl font-bold mb-3 font-display"
+            className="text-xl font-bold mb-2 font-display"
             style={{
-              backgroundImage: "linear-gradient(135deg, #00D9FF, #52F6E1)",
+              backgroundImage:
+                "linear-gradient(135deg, var(--color-brand-500), var(--color-primary-500))",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             }}
