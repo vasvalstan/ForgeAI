@@ -1,6 +1,7 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 import { db } from "@forge/db";
+import { deductOrganizationCredits, hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -16,6 +17,7 @@ export const config: ApiRouteConfig = {
     boardId: z.string().optional(),
     specTitle: z.string().optional(),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -34,7 +36,17 @@ export const handler: Handlers['TaskBreakdownTrigger'] = async (
   req,
   { logger, emit }
 ) => {
-  const { specId, boardId, specTitle, userId } = req.body;
+  const { specId, boardId, specTitle, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized task breakdown request", { specId, boardId });
+    return {
+      status: 402 as const,
+      body: {
+        error: "Unauthorized backend request.",
+      },
+    };
+  }
 
   logger.info("Task breakdown requested", { specId, boardId });
 
@@ -43,12 +55,12 @@ export const handler: Handlers['TaskBreakdownTrigger'] = async (
   if (specId) {
     spec = await db.spec.findUnique({
       where: { id: specId },
-      include: { board: { select: { ownerId: true, githubRepo: true, githubToken: true } } },
+      include: { board: { select: { organizationId: true, githubRepo: true, githubToken: true } } },
     });
   } else if (boardId && specTitle) {
     spec = await db.spec.findFirst({
       where: { boardId, title: { contains: specTitle } },
-      include: { board: { select: { ownerId: true, githubRepo: true, githubToken: true } } },
+      include: { board: { select: { organizationId: true, githubRepo: true, githubToken: true } } },
     });
   }
 
@@ -59,28 +71,14 @@ export const handler: Handlers['TaskBreakdownTrigger'] = async (
     };
   }
 
-  const ownerId = userId || spec.board.ownerId;
-  if (ownerId) {
-    const user = await db.user.findUnique({
-      where: { id: ownerId },
-      select: { credits: true },
-    });
-
-    if (user && user.credits < TASK_CREDIT_COST) {
-      return {
-        status: 402 as const,
-        body: {
-          error: `Insufficient credits. Task breakdown requires ${TASK_CREDIT_COST} credits, but you have ${user.credits}.`,
-        },
-      };
-    }
-
-    if (user) {
-      await db.user.update({
-        where: { id: ownerId },
-        data: { credits: { decrement: TASK_CREDIT_COST } },
-      });
-    }
+  const deduction = await deductOrganizationCredits(spec.board.organizationId, TASK_CREDIT_COST);
+  if (!deduction.ok) {
+    return {
+      status: 402 as const,
+      body: {
+        error: `Insufficient credits. Task breakdown requires ${TASK_CREDIT_COST} credits, but you have ${deduction.credits}.`,
+      },
+    };
   }
 
   await emit({
@@ -97,7 +95,7 @@ export const handler: Handlers['TaskBreakdownTrigger'] = async (
     status: 200 as const,
     body: {
       status: "processing",
-      message: `Task breakdown started for "${spec.title}". ${TASK_CREDIT_COST} credits deducted.`,
+      message: `Task breakdown started for "${spec.title}". ${TASK_CREDIT_COST} organization credits deducted.`,
     },
   };
 };

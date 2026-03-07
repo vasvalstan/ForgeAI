@@ -1,6 +1,7 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 import { db } from "@forge/db";
+import { hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -14,6 +15,7 @@ export const config: ApiRouteConfig = {
   bodySchema: z.object({
     specId: z.string(),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -36,7 +38,15 @@ const COMPLEXITY_LABELS: Record<string, string> = {
 };
 
 export const handler: Handlers['GitHubPush'] = async (req, { logger }) => {
-  const { specId } = req.body;
+  const { specId, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized GitHub push request", { specId });
+    return {
+      status: 400 as const,
+      body: { error: "Unauthorized backend request." },
+    };
+  }
 
   logger.info("GitHub push requested", { specId });
 

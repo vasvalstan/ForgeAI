@@ -63,6 +63,15 @@ declare module "tldraw" {
       targetShapeId: string;
       comments?: string; // JSON array of inline comments
     };
+    "alert_card": {
+      w: number;
+      h: number;
+      severity: string;
+      title: string;
+      content: string;
+      evidence: string;
+      targetShapeId: string;
+    };
     "comment": {
       w: number;
       h: number;
@@ -105,6 +114,7 @@ declare module "tldraw" {
 type StickyNoteShape = TLShape<"sticky-note">;
 type FeatureCardShape = TLShape<"feature-card">;
 type RiskFlagShape = TLShape<"risk-flag">;
+type AlertCardShape = TLShape<"alert_card">;
 type CommentShape = TLShape<"comment">;
 type PRDCardShape = TLShape<"prd-card">;
 type SpecCardShape = TLShape<"spec-card">;
@@ -1366,6 +1376,145 @@ export class RiskFlagShapeUtil extends ShapeUtil<RiskFlagShape> {
   }
 
   indicator(shape: RiskFlagShape) {
+    return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
+  }
+}
+
+// ─── Alert Card (Consensus Risk) Shape Util ───────────────────
+// High-confidence governance: only risks both Claude + Kimi agree on
+
+export class AlertCardShapeUtil extends ShapeUtil<AlertCardShape> {
+  static override readonly type = "alert_card" as const;
+
+  static override readonly props: RecordProps<AlertCardShape> = {
+    w: T.number,
+    h: T.number,
+    severity: T.string,
+    title: T.string,
+    content: T.string,
+    evidence: T.string,
+    targetShapeId: T.string,
+  };
+
+  getDefaultProps(): AlertCardShape["props"] {
+    return {
+      w: 280,
+      h: 140,
+      severity: "high",
+      title: "Consensus Risk Identified",
+      content: "",
+      evidence: "",
+      targetShapeId: "",
+    };
+  }
+
+  getGeometry(shape: AlertCardShape): Geometry2d {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true });
+  }
+
+  override canResize() { return true; }
+  override canEdit() { return true; }
+
+  override onResize(shape: any, info: TLResizeInfo<any>) {
+    return resizeBox(shape, info);
+  }
+
+  component(shape: AlertCardShape) {
+    const meta = (shape.meta ?? {}) as {
+      entryAnimation?: unknown;
+      entryAnimationAt?: unknown;
+      entryAnimationDelayMs?: unknown;
+      consensusGlow?: boolean;
+    };
+    const hasRecentEntryAnimation =
+      meta.entryAnimation === "fade-up" &&
+      typeof meta.entryAnimationAt === "number" &&
+      Date.now() - meta.entryAnimationAt < 4000;
+    const entryDelayMs =
+      typeof meta.entryAnimationDelayMs === "number"
+        ? Math.max(0, Math.min(600, meta.entryAnimationDelayMs))
+        : 0;
+    const hasConsensusGlow = meta.consensusGlow === true;
+
+    return (
+      <HTMLContainer style={{ width: "100%", height: "100%", pointerEvents: "all" }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            background: "#FFFFFF",
+            border: "1px solid rgba(6, 182, 212, 0.35)",
+            borderTop: "3px solid #7c3aed",
+            borderRadius: "14px",
+            padding: "14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            fontFamily: "var(--font-sans)",
+            boxShadow: hasConsensusGlow
+              ? "0 0 20px rgba(6, 182, 212, 0.25), 0 0 40px rgba(124, 58, 237, 0.15)"
+              : CARD_BASE.shadow,
+            animation: hasRecentEntryAnimation
+              ? `fade-up 300ms ease-out ${entryDelayMs}ms both`
+              : undefined,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "12px",
+                background: "rgba(124, 58, 237, 0.12)",
+                border: "1px solid rgba(124, 58, 237, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#7c3aed",
+              }}
+            >
+              <ShieldWarningIcon size={16} />
+            </span>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#7c3aed",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              {shape.props.title}
+            </span>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              fontSize: "13px",
+              lineHeight: "1.45",
+              color: CARD_BASE.text,
+              overflow: "hidden",
+            }}
+          >
+            {shape.props.content}
+          </div>
+          {shape.props.evidence && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: CARD_BASE.textDim,
+                fontStyle: "italic",
+              }}
+            >
+              Evidence: {shape.props.evidence}
+            </div>
+          )}
+        </div>
+      </HTMLContainer>
+    );
+  }
+
+  indicator(shape: AlertCardShape) {
     return <rect width={shape.props.w} height={shape.props.h} rx={14} ry={14} />;
   }
 }

@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSpecAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,8 +9,18 @@ export async function GET(
   const { specId } = await params;
 
   try {
-    const spec = await db.spec.findUnique({
-      where: { id: specId },
+    const access = await requireSpecAccess(specId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
+    const spec = await db.spec.findFirst({
+      where: {
+        id: specId,
+        board: {
+          organizationId: access.organization.id,
+        },
+      },
       include: {
         tasks: { orderBy: { createdAt: "asc" } },
         prd: { select: { id: true, title: true } },
@@ -45,9 +47,9 @@ export async function PATCH(
   const { specId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireSpecAccess(specId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const body = await req.json();
@@ -78,9 +80,9 @@ export async function DELETE(
   const { specId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireSpecAccess(specId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     await db.spec.delete({ where: { id: specId } });

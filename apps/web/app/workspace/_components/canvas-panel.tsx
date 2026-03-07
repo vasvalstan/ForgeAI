@@ -6,6 +6,7 @@ import {
   StickyNoteShapeUtil,
   FeatureCardShapeUtil,
   RiskFlagShapeUtil,
+  AlertCardShapeUtil,
   CommentShapeUtil,
   PRDCardShapeUtil,
   SpecCardShapeUtil,
@@ -21,6 +22,7 @@ const customShapeUtils = [
   StickyNoteShapeUtil,
   FeatureCardShapeUtil,
   RiskFlagShapeUtil,
+  AlertCardShapeUtil,
   CommentShapeUtil,
   PRDCardShapeUtil,
   SpecCardShapeUtil,
@@ -86,14 +88,16 @@ export function CanvasPanel() {
       const text = await file.text();
 
       try {
-        const res = await fetch("http://localhost:3111/discover", {
+        const res = await fetch(`/api/boards/${selectedBoardId}/agent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            boardId: selectedBoardId,
-            content: text,
-            sourceType: file.name.endsWith(".vtt") ? "transcript" : "notes",
-            fileName: file.name,
+            action: "discovery",
+            payload: {
+              content: text,
+              sourceType: file.name.endsWith(".vtt") ? "transcript" : "notes",
+              fileName: file.name,
+            },
           }),
         });
 
@@ -307,17 +311,18 @@ export function CanvasPanel() {
       const detail = (e as CustomEvent).detail;
       if (!detail?.shapeId || !selectedBoardId) return;
 
-      const MOTIA_BASE = process.env.NEXT_PUBLIC_MOTIA_BASE_URL || "http://localhost:3111";
       try {
-        await fetch(`${MOTIA_BASE}/visualize`, {
+        await fetch(`/api/boards/${selectedBoardId}/agent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            boardId: selectedBoardId,
-            shapeId: detail.shapeId,
-            description: `${detail.title}: ${detail.description}`,
-            x: detail.x ?? 0,
-            y: detail.y ?? 0,
+            action: "visualize",
+            payload: {
+              shapeId: detail.shapeId,
+              description: `${detail.title}: ${detail.description}`,
+              x: detail.x ?? 0,
+              y: detail.y ?? 0,
+            },
           }),
         });
 
@@ -484,14 +489,13 @@ export function CanvasPanel() {
           style={{
             left: shapeEditor.anchorX,
             top: shapeEditor.anchorY,
-            borderColor: "rgba(15, 23, 42, 0.10)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 100%)",
-            boxShadow: "0 18px 44px rgba(15, 23, 42, 0.18)",
+            borderColor: "var(--color-forge-border)",
+            background: "var(--color-forge-surface)",
+            boxShadow: "var(--shadow-dropdown)",
           }}
         >
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-[11px] font-semibold" style={{ color: "var(--color-forge-text-secondary)" }}>
+            <div className="text-[11px] font-semibold text-forge-text-secondary">
               {shapeEditor.mode === "feature"
                 ? "Edit feature card"
                 : shapeEditor.mode === "risk"
@@ -503,12 +507,7 @@ export function CanvasPanel() {
                       : "Edit insight"}
             </div>
             <span
-              className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{
-                color: "#1D4ED8",
-                background: "rgba(37, 99, 235, 0.10)",
-                border: "1px solid rgba(37, 99, 235, 0.18)",
-              }}
+              className="text-[10px] px-2 py-0.5 rounded-full text-primary-600 bg-primary-500/10 border border-primary-500/18"
             >
               {shapeEditor.mode === "new_comment" ? "Linked note" : "Quick edit"}
             </span>
@@ -516,13 +515,8 @@ export function CanvasPanel() {
           <textarea
             value={editorDraft}
             onChange={(e) => setEditorDraft(e.target.value)}
-            className="w-full rounded-xl px-3 py-2.5 text-xs leading-relaxed outline-none resize-none"
             rows={shapeEditor.mode === "feature" ? 6 : shapeEditor.mode === "new_comment" ? 4 : 5}
-            style={{
-              border: "1px solid rgba(15, 23, 42, 0.12)",
-              color: "#0F172A",
-              background: "#FFFFFF",
-            }}
+            className="w-full rounded-xl px-3 py-2.5 text-xs leading-relaxed outline-none resize-none border border-forge-border text-forge-text bg-forge-surface"
             placeholder={
               shapeEditor.mode === "feature"
                 ? "Title\n\nDescription"
@@ -536,19 +530,14 @@ export function CanvasPanel() {
             <button
               type="button"
               onClick={() => setShapeEditor(null)}
-              className="px-2.5 py-1.5 rounded-md text-[11px] cursor-pointer hover:bg-black/[0.04]"
-              style={{ color: "var(--color-forge-text-dim)" }}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-forge-text-dim"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSaveShapeEdit}
-              className="px-2.5 py-1.5 rounded-md text-[11px] cursor-pointer font-medium"
-              style={{
-                color: "white",
-                background: "var(--color-primary-500)",
-              }}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] cursor-pointer font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors"
             >
               {shapeEditor.mode === "new_comment" ? "Post Comment" : "Save"}
             </button>

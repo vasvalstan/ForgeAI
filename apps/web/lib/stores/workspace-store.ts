@@ -71,6 +71,9 @@ interface WorkspaceState {
   sidebarCollapsed: boolean;
   agentPanelCollapsed: boolean;
 
+  sidebarWidth: number;
+  agentPanelWidth: number;
+
   // Tree state
   expandedSections: Set<TreeSection>;
   expandedBoardIds: Set<string>;
@@ -109,6 +112,8 @@ interface WorkspaceState {
   selectDiscovery: (discoveryId: string | null) => void;
   toggleSidebar: () => void;
   toggleAgentPanel: () => void;
+  setSidebarWidth: (width: number) => void;
+  setAgentPanelWidth: (width: number) => void;
   toggleSection: (section: TreeSection) => void;
   toggleBoardExpanded: (boardId: string) => void;
   setBoards: (boards: BoardItem[]) => void;
@@ -130,6 +135,8 @@ interface WorkspaceState {
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedBoardId: null,
   selectedDiscoveryId: null,
+  sidebarWidth: 240,
+  agentPanelWidth: 280,
   sidebarCollapsed: false,
   agentPanelCollapsed: false,
   expandedSections: new Set<TreeSection>(["boards"]),
@@ -161,6 +168,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
 
   toggleAgentPanel: () =>
     set((s) => ({ agentPanelCollapsed: !s.agentPanelCollapsed })),
+
+  setSidebarWidth: (width) => set({ sidebarWidth: width }),
+  setAgentPanelWidth: (width) => set({ agentPanelWidth: width }),
 
   toggleSection: (section) =>
     set((s) => {

@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions", "driverAdapters"]
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
@@ -9,21 +9,48 @@ datasource db {
   extensions = [vector]
 }
 
+enum OrganizationRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+enum OrganizationMembershipStatus {
+  active
+  invited
+  suspended
+}
+
+enum OrganizationInvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
 // ─── Auth ────────────────────────────────────────────────
 model User {
-  id            String  @id @default(cuid())
-  email         String  @unique
-  emailVerified Boolean @default(false)
-  name          String?
-  image         String?
-  credits       Int     @default(100)
+  id                   String  @id @default(cuid())
+  email                String  @unique
+  emailVerified        Boolean @default(false)
+  name                 String?
+  image                String?
+  credits              Int     @default(100)
+  activeOrganizationId String?
 
-  boards   Board[]
-  sessions Session[]
-  accounts Account[]
+  activeOrganization         Organization?           @relation("ActiveOrganization", fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+  createdBoards              Board[]                 @relation("CreatedBoards")
+  createdOrganizations       Organization[]          @relation("CreatedOrganizations")
+  organizationMemberships    OrganizationMembership[]
+  sentOrganizationInvites    OrganizationInvitation[] @relation("OrganizationInvitationsSent")
+  sessions                   Session[]
+  accounts                   Account[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([activeOrganizationId])
 }
 
 model Session {
@@ -66,16 +93,78 @@ model Verification {
   updatedAt  DateTime @updatedAt
 }
 
+// ─── Organizations ───────────────────────────────────────
+model Organization {
+  id              String  @id @default(cuid())
+  name            String
+  slug            String  @unique
+  credits         Int     @default(100)
+  createdByUserId String?
+
+  activeUsers  User[]                  @relation("ActiveOrganization")
+  boards       Board[]
+  createdBy    User?                   @relation("CreatedOrganizations", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  invitations  OrganizationInvitation[]
+  memberships  OrganizationMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdByUserId])
+}
+
+model OrganizationMembership {
+  id             String                       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole            @default(editor)
+  status         OrganizationMembershipStatus @default(active)
+  joinedAt       DateTime                    @default(now())
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model OrganizationInvitation {
+  id               String                       @id @default(cuid())
+  organizationId   String
+  email            String
+  role             OrganizationRole            @default(editor)
+  status           OrganizationInvitationStatus @default(pending)
+  token            String                       @unique
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  invitedByUserId  String?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  invitedBy    User?         @relation("OrganizationInvitationsSent", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([organizationId, email])
+}
+
 // ─── Boards ──────────────────────────────────────────────
 model Board {
-  id               String  @id @default(cuid())
+  id               String       @id @default(cuid())
   title            String
   thumbnailUrl     String?
-  owner            User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId          String
-  liveblocksRoomId String  @unique
+  organizationId   String
+  createdById      String?
+  liveblocksRoomId String       @unique
   githubRepo       String? // "owner/repo" format
   githubToken      String? // encrypted PAT
+
+  createdBy    User?         @relation("CreatedBoards", fields: [createdById], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   discoveries   Discovery[]
   conversations Conversation[]
@@ -86,7 +175,8 @@ model Board {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([ownerId])
+  @@index([organizationId])
+  @@index([createdById])
 }
 
 // ─── Discovery Sessions ──────────────────────────────────

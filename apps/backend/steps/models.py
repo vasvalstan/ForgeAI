@@ -21,6 +21,14 @@ class UserRead(BaseModel):
     name: Optional[str] = None
     image: Optional[str] = None
     credits: int = 100
+    activeOrganizationId: Optional[str] = None
+
+
+class OrganizationRead(BaseModel):
+    id: str
+    name: str
+    slug: str
+    credits: int = 100
 
 
 # ─── Board Models ─────────────────────────────────────────
@@ -28,7 +36,8 @@ class UserRead(BaseModel):
 class BoardRead(BaseModel):
     id: str
     title: str
-    ownerId: str
+    organizationId: str
+    createdById: Optional[str] = None
     liveblocksRoomId: str
     thumbnailUrl: Optional[str] = None
 

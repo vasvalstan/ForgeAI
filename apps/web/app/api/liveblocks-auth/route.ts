@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Liveblocks } from "@liveblocks/node";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { getPresenceColor } from "@/lib/liveblocks-client";
+import { requireBoardAccess, requireBoardAccessByRoom } from "@/lib/tenant-auth";
 
 const liveblocks = new Liveblocks({
   secret: process.env.LIVEBLOCKS_SECRET_KEY!,
@@ -10,37 +9,43 @@ const liveblocks = new Liveblocks({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { room, boardId } = await req.json();
+    if (typeof room !== "string" && typeof boardId !== "string") {
+      return NextResponse.json({ error: "room or boardId is required" }, { status: 400 });
+    }
 
-    const userId = session?.user?.id ?? `anon-${Date.now()}`;
-    const userName = session?.user?.name ?? "Anonymous";
-    const userEmail = session?.user?.email ?? "";
-    const userPicture = session?.user?.image ?? undefined;
+    const access =
+      typeof room === "string" && room
+        ? await requireBoardAccessByRoom(room, "viewer")
+        : await requireBoardAccess(boardId as string, "viewer");
+
+    if ("response" in access) {
+      return access.response;
+    }
+
+    const userId = access.user.id;
+    const userName = access.user.name ?? "Anonymous";
+    const userEmail = access.user.email;
 
     const lbSession = liveblocks.prepareSession(userId, {
       userInfo: {
         name: userName,
         email: userEmail,
-        picture: userPicture,
         color: getPresenceColor(userId),
       },
     });
 
-    // Parse the room from the request body
-    const { room } = await req.json();
+    const grantedRoom = access.board.liveblocksRoomId;
+    const permission =
+      access.membership.role === "viewer"
+        ? lbSession.READ_ACCESS
+        : lbSession.FULL_ACCESS;
 
-    if (room) {
-      lbSession.allow(room, lbSession.FULL_ACCESS);
-    } else {
-      // Allow access to all forge rooms
-      lbSession.allow("forge-room-*", lbSession.FULL_ACCESS);
-    }
+    lbSession.allow(grantedRoom, permission);
 
     const { status, body } = await lbSession.authorize();
     return new NextResponse(body, { status });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to authenticate with Liveblocks" },
       { status: 500 }

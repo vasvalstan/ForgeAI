@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "../components/theme-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -29,22 +30,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="antialiased">
-        <Toaster
-          position="bottom-right"
-          theme="light"
-          toastOptions={{
-            style: {
-              background: "rgba(255, 255, 255, 0.95)",
-              border: "1px solid rgba(15, 23, 42, 0.12)",
-              backdropFilter: "blur(14px)",
-              color: "#0F172A",
-              fontFamily: "var(--font-inter), system-ui, sans-serif",
-            },
-          }}
-        />
-        {children}
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <body className="antialiased dark:bg-ink-950 dark:text-forge-text">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Toaster
+            position="bottom-right"
+            theme="system"
+            toastOptions={{
+              className: "dark:bg-[#1e1e1e] dark:border-[#333] dark:text-[#ececec]",
+              style: {
+                background: "rgba(255, 255, 255, 0.95)",
+                border: "1px solid rgba(15, 23, 42, 0.12)",
+                backdropFilter: "blur(14px)",
+                color: "#0F172A",
+                fontFamily: "var(--font-inter), system-ui, sans-serif",
+              },
+            }}
+          />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

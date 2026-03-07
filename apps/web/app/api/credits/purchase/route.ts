@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { requireOrganizationContext } from "@/lib/tenant-auth";
+import { db } from "@forge/db";
 
 const POLAR_ACCESS_TOKEN = process.env.POLAR_ACCESS_TOKEN ?? "";
 const POLAR_API = "https://api.polar.sh/v1";
@@ -18,12 +18,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireOrganizationContext("admin");
+    if ("response" in access) {
+      return access.response;
     }
 
     const { packageId } = await req.json();
@@ -35,9 +32,8 @@ export async function POST(req: NextRequest) {
 
     if (!POLAR_ACCESS_TOKEN) {
       // Fallback: directly add credits for development/demo
-      const { db } = await import("@forge/db");
-      await db.user.update({
-        where: { id: session.user.id },
+      await db.organization.update({
+        where: { id: access.organization.id },
         data: { credits: { increment: pkg.amount } },
       });
 
@@ -59,7 +55,8 @@ export async function POST(req: NextRequest) {
         product_id: pkg.id,
         success_url: `${process.env.NEXT_PUBLIC_APP_URL}/?credits=success`,
         metadata: {
-          userId: session.user.id,
+          organizationId: access.organization.id,
+          userId: access.user.id,
           creditAmount: pkg.amount.toString(),
         },
       }),
@@ -75,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const checkout = await checkoutRes.json();
     return NextResponse.json({ checkoutUrl: checkout.url });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to create checkout" },
       { status: 500 }

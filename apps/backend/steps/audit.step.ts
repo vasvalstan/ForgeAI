@@ -1,6 +1,6 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
-import { db } from "@forge/db";
+import { deductOrganizationCredits, getBoardTenantContext, hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -23,6 +23,7 @@ export const config: ApiRouteConfig = {
       })
     ),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -42,7 +43,17 @@ export const handler: Handlers['AuditTrigger'] = async (
   req,
   { logger, emit }
 ) => {
-  const { boardId, shapes, userId } = req.body;
+  const { boardId, shapes, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized audit request", { boardId });
+    return {
+      status: 402 as const,
+      body: {
+        error: "Unauthorized backend request.",
+      },
+    };
+  }
 
   logger.info("Received audit request", {
     boardId,
@@ -50,10 +61,7 @@ export const handler: Handlers['AuditTrigger'] = async (
   });
 
   // Verify the board exists
-  const board = await db.board.findUnique({
-    where: { id: boardId },
-    select: { id: true, ownerId: true },
-  });
+  const board = await getBoardTenantContext(boardId);
 
   if (!board) {
     return {
@@ -66,32 +74,17 @@ export const handler: Handlers['AuditTrigger'] = async (
   }
 
   // Check and deduct credits for Deep Red Hat Audit
-  const ownerId = userId || board.ownerId;
-  if (ownerId) {
-    const user = await db.user.findUnique({
-      where: { id: ownerId },
-      select: { credits: true },
-    });
-
-    if (user && user.credits < AUDIT_CREDIT_COST) {
-      return {
-        status: 402 as const,
-        body: {
-          error: `Insufficient credits. Deep Red Hat Audit requires ${AUDIT_CREDIT_COST} credits, but you have ${user.credits}.`,
-        },
-      };
-    }
-
-    if (user) {
-      await db.user.update({
-        where: { id: ownerId },
-        data: { credits: { decrement: AUDIT_CREDIT_COST } },
-      });
-      logger.info(
-        `Deducted ${AUDIT_CREDIT_COST} credits from user ${ownerId}`
-      );
-    }
+  const deduction = await deductOrganizationCredits(board.organizationId, AUDIT_CREDIT_COST);
+  if (!deduction.ok) {
+    return {
+      status: 402 as const,
+      body: {
+        error: `Insufficient credits. Deep Red Hat Audit requires ${AUDIT_CREDIT_COST} credits, but you have ${deduction.credits}.`,
+      },
+    };
   }
+
+  logger.info(`Deducted ${AUDIT_CREDIT_COST} credits from organization ${board.organizationId}`);
 
   // Enqueue the Python Red Hat Audit Agent
   await emit({ topic: "redhat.audit", data: { boardId, shapes } });
@@ -102,7 +95,7 @@ export const handler: Handlers['AuditTrigger'] = async (
     status: 200 as const,
     body: {
       status: "processing",
-      message: `Red Hat Audit is analyzing ${shapes.length} shapes. ${AUDIT_CREDIT_COST} credits deducted.`,
+      message: `Red Hat Audit is analyzing ${shapes.length} shapes. ${AUDIT_CREDIT_COST} organization credits deducted.`,
     },
   };
 };

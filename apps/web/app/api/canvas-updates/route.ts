@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireBoardAccess } from "@/lib/tenant-auth";
 
 /**
  * In-memory store for pending canvas shapes pushed by the Motia backend.
  * Keyed by boardId → array of shape payloads.
  * This avoids relying on Liveblocks real-time for shape delivery.
  */
-const pendingShapes = new Map<string, any[]>();
+type PendingShape = Record<string, unknown>;
+
+const pendingShapes = new Map<string, PendingShape[]>();
+const INTERNAL_SECRET = process.env.FORGE_INTERNAL_SECRET ?? "";
 
 // Auto-expire entries after 60 seconds to prevent memory leaks
 const TTL_MS = 60_000;
@@ -27,6 +31,11 @@ function cleanup() {
  */
 export async function POST(req: NextRequest) {
   try {
+    const internalSecret = req.headers.get("x-forge-internal-secret") ?? "";
+    if (INTERNAL_SECRET && internalSecret !== INTERNAL_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { boardId, shapes } = await req.json();
 
     if (!boardId || !Array.isArray(shapes)) {
@@ -56,6 +65,11 @@ export async function GET(req: NextRequest) {
 
   if (!boardId) {
     return NextResponse.json({ shapes: [] });
+  }
+
+  const access = await requireBoardAccess(boardId, "viewer");
+  if ("response" in access) {
+    return access.response;
   }
 
   cleanup();

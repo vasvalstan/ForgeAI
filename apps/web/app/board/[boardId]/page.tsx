@@ -6,6 +6,7 @@ import {
   StickyNoteShapeUtil,
   FeatureCardShapeUtil,
   RiskFlagShapeUtil,
+  AlertCardShapeUtil,
   CommentShapeUtil,
   PRDCardShapeUtil,
   SpecCardShapeUtil,
@@ -15,7 +16,7 @@ import { AISidebar } from "./_components/ai-sidebar";
 import { DiscoveryDropZone } from "./_components/discovery-drop-zone";
 import { Sparkle } from "@phosphor-icons/react";
 
-const customShapeUtils = [StickyNoteShapeUtil, FeatureCardShapeUtil, RiskFlagShapeUtil, CommentShapeUtil, PRDCardShapeUtil, SpecCardShapeUtil, TaskListShapeUtil];
+const customShapeUtils = [StickyNoteShapeUtil, FeatureCardShapeUtil, RiskFlagShapeUtil, AlertCardShapeUtil, CommentShapeUtil, PRDCardShapeUtil, SpecCardShapeUtil, TaskListShapeUtil];
 
 interface BoardPageProps {
   params: Promise<{ boardId: string }>;

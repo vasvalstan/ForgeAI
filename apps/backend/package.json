@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx dotenv-cli -- npx motia dev --port 3111",
+    "dev": "npx dotenv-cli -- npx motia dev --port 4111",
     "lint": "echo 'No lint configured for backend'"
   },
   "dependencies": {

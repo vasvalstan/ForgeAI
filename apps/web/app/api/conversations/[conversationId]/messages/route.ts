@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireConversationAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
 
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
   const { conversationId } = await params;
 
   try {
+    const access = await requireConversationAccess(conversationId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
     const messages = await db.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: "asc" },
@@ -29,6 +35,11 @@ export async function POST(
   const { conversationId } = await params;
 
   try {
+    const access = await requireConversationAccess(conversationId, "editor");
+    if ("response" in access) {
+      return access.response;
+    }
+
     const { role, content, status } = await req.json();
 
     const message = await db.message.create({

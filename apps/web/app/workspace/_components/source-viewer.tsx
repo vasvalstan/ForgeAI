@@ -71,12 +71,12 @@ export function SourceViewer() {
       <>
         <span>{before}</span>
         <mark
+          className="text-forge-text"
           style={{
-            background: "rgba(37, 99, 235, 0.20)",
-            color: "#0F172A",
+            background: "rgba(37, 99, 235, 0.15)",
             padding: "2px 4px",
             borderRadius: "4px",
-            border: "1px solid rgba(37, 99, 235, 0.35)",
+            border: "1px solid rgba(37, 99, 235, 0.30)",
           }}
         >
           {highlighted}
@@ -101,12 +101,8 @@ export function SourceViewer() {
 
       {/* Panel */}
       <div
-        className="relative ml-auto h-full flex flex-col glass shadow-panel"
-        style={{
-          width: 480,
-          background: "rgba(255, 255, 255, 0.96)",
-          borderLeft: "1px solid var(--color-forge-border)",
-        }}
+        className="relative ml-auto h-full flex flex-col shadow-panel bg-forge-surface/97 dark:bg-forge-surface border-l border-forge-border"
+        style={{ width: 480 }}
       >
         {/* Header */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-forge-border/30 flex-shrink-0">

@@ -1,23 +1,19 @@
 import { NextResponse } from "next/server";
+import { requireOrganizationContext } from "@/lib/tenant-auth";
 
 export async function GET() {
   try {
-    const { auth } = await import("@/lib/auth");
-    const { headers } = await import("next/headers");
-    const session = await auth.api.getSession({ headers: await headers() });
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ credits: 100 });
+    const access = await requireOrganizationContext("viewer");
+    if ("response" in access) {
+      return access.response;
     }
 
-    const { db } = await import("@forge/db");
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { credits: true },
+    return NextResponse.json({
+      credits: access.organization.credits,
+      organization: access.organization,
+      membership: access.membership,
     });
-
-    return NextResponse.json({ credits: user?.credits ?? 100 });
   } catch {
-    return NextResponse.json({ credits: 100 });
+    return NextResponse.json({ error: "Failed to fetch credits" }, { status: 500 });
   }
 }

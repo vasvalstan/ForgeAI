@@ -23,11 +23,11 @@ declare module 'motia' {
     'AskTrigger': ApiRouteHandler<unknown, ApiResponse<200, unknown>, { topic: 'general.ask'; data: never }>
     'TaskAgent': EventHandler<never, { topic: 'canvas.update'; data: never }>
     'SpecAgent': EventHandler<never, { topic: 'canvas.update'; data: never }>
-    'RedHatAuditAgent': EventHandler<never, { topic: 'canvas.update'; data: never }>
     'PRDAgent': EventHandler<never, { topic: 'canvas.update'; data: never }>
     'MockGenerator': EventHandler<never, { topic: 'canvas.update'; data: never }>
     'GeneralAgent': EventHandler<never, never>
     'DiscoveryAgent': EventHandler<never, { topic: 'canvas.update'; data: never }>
+    'RedHatConsensusAudit': EventHandler<never, { topic: 'canvas.update'; data: never }>
   }
     
 }

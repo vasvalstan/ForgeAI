@@ -1,0 +1,179 @@
+---
+description: ForgeAI design system — colors, typography, spacing, components, and patterns. Reference this when building any UI.
+alwaysApply: true
+---
+
+# ForgeAI Design System v6
+
+Reference design: `/assets/Screenshot_2026-03-07_at_11.43.53-205d57af-dd94-47af-a45e-cc683ba74ad2.png`
+Full spec: `DESIGN_SYSTEM.md` at project root.
+
+## Stack
+
+- Tailwind CSS v4 (`@theme` in `globals.css`, no config file)
+- Radix UI primitives (Dialog, DropdownMenu, ScrollArea, Separator, Tooltip)
+- Phosphor Icons (`@phosphor-icons/react`) for workspace, Lucide for landing
+- `class-variance-authority` + `clsx` + `tailwind-merge` for variant composition
+- `next-themes` with class strategy (light/dark/system)
+- `motion` for animations
+
+## Color Tokens — "Technical Light"
+
+Cool neutral grayscale base with high-chroma semantic accents.
+Use CSS variables via Tailwind classes (e.g. `bg-forge-bg`, `text-forge-text`).
+
+### Backgrounds
+
+| Token                  | Light            | Dark            | Usage                       |
+|------------------------|------------------|-----------------|-----------------------------|
+| `--color-forge-bg`     | `#F8F9FA`        | `#0a0a0a`       | App background (cool neutral)|
+| `--color-forge-surface`| `#ffffff`        | `#141414`       | Cards, panels, modals       |
+| `--color-forge-surface-2`| `#F1F3F5`     | `#1e1e1e`       | Toolbars, nested inputs     |
+
+### Text
+
+| Token                        | Light      | Dark       |
+|------------------------------|------------|------------|
+| `--color-forge-text`         | `#212529`  | `#ececec`  |
+| `--color-forge-text-secondary`| `#495057` | `#a3a3a3`  |
+| `--color-forge-text-dim`     | `#868E96`  | `#888888`  |
+
+### Borders
+
+| Token                        | Light                    | Dark                        |
+|------------------------------|--------------------------|-----------------------------|
+| `--color-forge-border`       | `rgba(0, 0, 0, 0.08)`   | `rgba(255, 255, 255, 0.12)` |
+| `--color-forge-border-subtle`| `rgba(0, 0, 0, 0.05)`   | `rgba(255, 255, 255, 0.08)` |
+
+### Status Badge Colors — PASTEL backgrounds with DARK text
+
+| Status   | Background | Text          | Class pattern                        |
+|----------|------------|---------------|--------------------------------------|
+| Running  | `#99E9F2`  | `forge-text`  | `bg-status-running text-forge-text`  |
+| Inactive | `#DEE2E6`  | `forge-text`  | `bg-status-inactive text-forge-text` |
+| Overdue  | `#FFC9C9`  | `forge-text`  | `bg-status-overdue text-forge-text`  |
+| Done     | `#B2F2BB`  | `forge-text`  | `bg-status-done text-forge-text`     |
+
+### Sidebar Active Highlight
+
+| Token                    | Value     | Usage                                |
+|--------------------------|-----------|--------------------------------------|
+| `--color-forge-amber-bg` | `#E9D8A6` | Selected sidebar item background     |
+| `--color-forge-amber`    | `#b8860b` | Team label text accent               |
+
+### Accents
+
+| Token               | Value     | Usage                  |
+|----------------------|-----------|------------------------|
+| `--color-primary-*`  | `#2563eb` | Links, active states   |
+| `--color-brand-*`    | `#7c3aed` | Brand gradient, canvas |
+
+## Typography
+
+Font: **Inter** via `next/font/google` (`--font-inter`).
+
+| Role             | Size    | Weight   | Tracking     | Transform  |
+|------------------|---------|----------|--------------|------------|
+| Logo "FORGE AI"  | `16px`  | `700`    | `0.08em`     | `uppercase`|
+| Nav link         | `14px`  | `500`    | `-0.01em`    | —          |
+| Section header   | `11px`  | `600`    | `0.06em`     | `uppercase`|
+| Card title       | `14px`  | `600`    | `-0.01em`    | —          |
+| Card body        | `13px`  | `400`    | `-0.005em`   | —          |
+| Meta/dates       | `12px`  | `400`    | `0`          | —          |
+| Badge label      | `12px`  | `600`    | `0`          | —          |
+| Caption/helper   | `11px`  | `400`    | `0`          | —          |
+
+## Spacing: 16–20px padding inside cards/sidebar items. Card grid gap: 16px.
+
+## Border Radius
+
+| Element          | Radius          | Tailwind class   |
+|------------------|-----------------|------------------|
+| Cards            | `12–16px`       | `rounded-xl`     |
+| Status badges    | `9999px`        | `rounded-full`   |
+| Buttons          | `8px`           | `rounded-lg`     |
+| Avatars          | `9999px`        | `rounded-full`   |
+| Dropdown menus   | `12px`          | `rounded-xl`     |
+| Floating toolbar | `9999px`        | `rounded-full`   |
+
+## Shadows
+
+```css
+--shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);      /* soft wide spread */
+--shadow-panel: 0 1px 2px rgba(15,23,42,0.06), 0 10px 28px rgba(15,23,42,0.10);
+--shadow-dropdown: 0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+```
+
+## Layout
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Top Nav: Logo | Home · Settings | Search Avatars Share | Bell Avatar │
+├──────────┬──────────────────────────┬────────────────┤
+│ Projects │ Content (Cards/Canvas)   │ AI Assistant   │
+│ Sidebar  │                          │ Panel          │
+│ 240px    │ flex-1                   │ 280px          │
+├──────────┴──────────────────────────┴────────────────┤
+│ Bottom Toolbar (glassmorphism pill, centered icons)   │
+└──────────────────────────────────────────────────────┘
+```
+
+## Component Patterns
+
+### Status Badge (PASTEL pill, dark text)
+
+```tsx
+<span className={cn(
+  "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold",
+  status === "running" && "bg-status-running text-forge-text",
+  status === "inactive" && "bg-status-inactive text-forge-text",
+  status === "overdue" && "bg-status-overdue text-forge-text",
+  status === "done" && "bg-status-done text-forge-text",
+)}>
+  {label} <ChevronDown size={12} />
+</span>
+```
+
+### Card (Task/Project)
+
+```tsx
+<div className="bg-forge-surface rounded-xl shadow-card p-4 border border-forge-border-subtle">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-xs font-medium text-forge-amber">Team 1</span>
+    <StatusBadge status="running" />
+  </div>
+  <h3 className="text-sm font-semibold text-forge-text mb-1">{title}</h3>
+  <p className="text-[13px] text-forge-text-secondary line-clamp-2">{description}</p>
+  <div className="flex items-center justify-between mt-3 text-xs text-forge-text-dim">
+    <span>Due: {date}</span>
+    <AvatarStack users={assignees} />
+  </div>
+</div>
+```
+
+### Sidebar Tree Item
+
+```tsx
+<button className={cn(
+  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors",
+  isSelected
+    ? "bg-forge-amber-bg text-forge-text font-medium"
+    : "text-forge-text-secondary hover:bg-black/[0.03]"
+)}>
+```
+
+### Bottom Floating Toolbar
+
+```tsx
+<div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 glass rounded-full px-2 py-1.5 flex items-center gap-1 shadow-panel">
+  {tools.map(tool => <IconButton key={tool.id} ... />)}
+</div>
+```
+
+## Conventions
+
+- Prefer CSS variables via Tailwind classes over inline `style={{ }}` props
+- Use `cn()` from `clsx`/`tailwind-merge` for conditional classes
+- All interactive elements: `cursor-pointer`, visible focus ring
+- File naming: kebab-case for files, PascalCase for components
+- Icons: Phosphor for workspace (size 16-18), Lucide for landing (size 20-24)

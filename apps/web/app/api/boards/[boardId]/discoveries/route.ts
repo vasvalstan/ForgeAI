@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireBoardAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
 
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
   const { boardId } = await params;
 
   try {
+    const access = await requireBoardAccess(boardId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
     const discoveries = await db.discovery.findMany({
       where: { boardId },
       orderBy: { createdAt: "desc" },

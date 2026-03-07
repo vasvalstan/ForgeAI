@@ -1,6 +1,6 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
-import { db } from "@forge/db";
+import { deductOrganizationCredits, getBoardTenantContext, hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -18,6 +18,7 @@ export const config: ApiRouteConfig = {
     x: z.number().optional(),
     y: z.number().optional(),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -36,14 +37,21 @@ export const handler: Handlers['MockTrigger'] = async (
   req,
   { logger, emit }
 ) => {
-  const { boardId, shapeId, description, x, y, userId } = req.body;
+  const { boardId, shapeId, description, x, y, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized mock request", { boardId });
+    return {
+      status: 402 as const,
+      body: {
+        error: "Unauthorized backend request.",
+      },
+    };
+  }
 
   logger.info("Mock generation requested", { boardId, shapeId, description: description.slice(0, 60) });
 
-  const board = await db.board.findUnique({
-    where: { id: boardId },
-    select: { id: true, ownerId: true },
-  });
+  const board = await getBoardTenantContext(boardId);
 
   if (!board) {
     return {
@@ -52,28 +60,14 @@ export const handler: Handlers['MockTrigger'] = async (
     };
   }
 
-  const ownerId = userId || board.ownerId;
-  if (ownerId) {
-    const user = await db.user.findUnique({
-      where: { id: ownerId },
-      select: { credits: true },
-    });
-
-    if (user && user.credits < MOCK_CREDIT_COST) {
-      return {
-        status: 402 as const,
-        body: {
-          error: `Insufficient credits. Mock generation requires ${MOCK_CREDIT_COST} credits, but you have ${user.credits}.`,
-        },
-      };
-    }
-
-    if (user) {
-      await db.user.update({
-        where: { id: ownerId },
-        data: { credits: { decrement: MOCK_CREDIT_COST } },
-      });
-    }
+  const deduction = await deductOrganizationCredits(board.organizationId, MOCK_CREDIT_COST);
+  if (!deduction.ok) {
+    return {
+      status: 402 as const,
+      body: {
+        error: `Insufficient credits. Mock generation requires ${MOCK_CREDIT_COST} credits, but you have ${deduction.credits}.`,
+      },
+    };
   }
 
   await emit({
@@ -91,7 +85,7 @@ export const handler: Handlers['MockTrigger'] = async (
     status: 200 as const,
     body: {
       status: "processing",
-      message: `Mock generation started. ${MOCK_CREDIT_COST} credits deducted. The visual will appear on your canvas shortly.`,
+      message: `Mock generation started. ${MOCK_CREDIT_COST} organization credits deducted. The visual will appear on your canvas shortly.`,
     },
   };
 };

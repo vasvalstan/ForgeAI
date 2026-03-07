@@ -1,6 +1,7 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
 import { db } from "@forge/db";
+import { deductOrganizationCredits, getBoardTenantContext, hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -19,6 +20,7 @@ export const config: ApiRouteConfig = {
       .default("transcript"),
     fileName: z.string().optional(),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -38,7 +40,17 @@ export const handler: Handlers['UploadTranscript'] = async (
   req,
   { logger, emit }
 ) => {
-  const { boardId, content, sourceType, fileName, userId } = req.body;
+  const { boardId, content, sourceType, fileName, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized discovery request", { boardId });
+    return {
+      status: 402 as const,
+      body: {
+        error: "Unauthorized backend request.",
+      },
+    };
+  }
 
   logger.info("Received transcript upload", {
     boardId,
@@ -48,10 +60,7 @@ export const handler: Handlers['UploadTranscript'] = async (
   });
 
   // Verify the board exists
-  const board = await db.board.findUnique({
-    where: { id: boardId },
-    select: { id: true, ownerId: true },
-  });
+  const board = await getBoardTenantContext(boardId);
 
   if (!board) {
     logger.warn(`Board not found: ${boardId}`);
@@ -66,34 +75,18 @@ export const handler: Handlers['UploadTranscript'] = async (
   }
 
   // Check and deduct credits
-  const ownerId = userId || board.ownerId;
-  if (ownerId) {
-    const user = await db.user.findUnique({
-      where: { id: ownerId },
-      select: { credits: true },
-    });
-
-    if (user && user.credits < DISCOVERY_CREDIT_COST) {
-      logger.warn(`Insufficient credits for user ${ownerId}`);
-      return {
-        status: 402 as const,
-        body: {
-          error: `Insufficient credits. Discovery requires ${DISCOVERY_CREDIT_COST} credit(s), but you have ${user.credits}.`,
-        },
-      };
-    }
-
-    // Deduct credits
-    if (user) {
-      await db.user.update({
-        where: { id: ownerId },
-        data: { credits: { decrement: DISCOVERY_CREDIT_COST } },
-      });
-      logger.info(
-        `Deducted ${DISCOVERY_CREDIT_COST} credit(s) from user ${ownerId}`
-      );
-    }
+  const deduction = await deductOrganizationCredits(board.organizationId, DISCOVERY_CREDIT_COST);
+  if (!deduction.ok) {
+    logger.warn(`Insufficient credits for organization ${board.organizationId}`);
+    return {
+      status: 402 as const,
+      body: {
+        error: `Insufficient credits. Discovery requires ${DISCOVERY_CREDIT_COST} credit(s), but you have ${deduction.credits}.`,
+      },
+    };
   }
+
+  logger.info(`Deducted ${DISCOVERY_CREDIT_COST} credit(s) from organization ${board.organizationId}`);
 
   // If meeting notes, also create a MeetingNote record
   if (sourceType === "meeting_notes") {
@@ -142,7 +135,7 @@ export const handler: Handlers['UploadTranscript'] = async (
     body: {
       discoveryId: discovery.id,
       status: "processing",
-      message: `Discovery "${fileName ?? "upload"}" is being analyzed. ${DISCOVERY_CREDIT_COST} credit(s) deducted.`,
+      message: `Discovery "${fileName ?? "upload"}" is being analyzed. ${DISCOVERY_CREDIT_COST} organization credit(s) deducted.`,
     },
   };
 };

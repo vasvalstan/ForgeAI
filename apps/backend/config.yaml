@@ -8,9 +8,10 @@ services:
   motia:
     image: motia
     config:
-      port: 3111
+      port: 4111
       steps_dir: ./steps
       # Python steps require these env vars at runtime:
       #   DATABASE_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY
+      #   MOONSHOT_API_KEY (Kimi K2 cross-check), DASHSCOPE_API_KEY (Qwen consensus resolver)
       #   LANGCHAIN_API_KEY, LANGCHAIN_PROJECT, LANGCHAIN_TRACING_V2
       #   LIVEBLOCKS_SECRET_KEY

@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireBoardAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,8 +9,16 @@ export async function GET(
   const { boardId } = await params;
 
   try {
-    const board = await db.board.findUnique({
-      where: { id: boardId },
+    const access = await requireBoardAccess(boardId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
+    const board = await db.board.findFirst({
+      where: {
+        id: boardId,
+        organizationId: access.organization.id,
+      },
       include: {
         discoveries: {
           orderBy: { createdAt: "desc" },
@@ -27,6 +27,14 @@ export async function GET(
         prds: { orderBy: { updatedAt: "desc" } },
         meetingNotes: { orderBy: { updatedAt: "desc" } },
         _count: { select: { discoveries: true, conversations: true } },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            credits: true,
+          },
+        },
       },
     });
 
@@ -50,15 +58,15 @@ export async function PATCH(
   const { boardId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireBoardAccess(boardId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const { title } = await req.json();
 
     const board = await db.board.update({
-      where: { id: boardId, ownerId: session.user.id },
+      where: { id: boardId },
       data: { title },
     });
 
@@ -78,13 +86,13 @@ export async function DELETE(
   const { boardId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireBoardAccess(boardId, "admin");
+    if ("response" in access) {
+      return access.response;
     }
 
     await db.board.delete({
-      where: { id: boardId, ownerId: session.user.id },
+      where: { id: boardId },
     });
 
     return NextResponse.json({ success: true });

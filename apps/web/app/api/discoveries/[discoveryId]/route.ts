@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireDiscoveryAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
 
 export async function GET(
@@ -8,8 +9,18 @@ export async function GET(
   const { discoveryId } = await params;
 
   try {
-    const discovery = await db.discovery.findUnique({
-      where: { id: discoveryId },
+    const access = await requireDiscoveryAccess(discoveryId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
+    const discovery = await db.discovery.findFirst({
+      where: {
+        id: discoveryId,
+        board: {
+          organizationId: access.organization.id,
+        },
+      },
       select: {
         id: true,
         boardId: true,

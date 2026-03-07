@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireBoardAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,8 +9,16 @@ export async function GET(
   const { boardId } = await params;
 
   try {
-    const board = await db.board.findUnique({
-      where: { id: boardId },
+    const access = await requireBoardAccess(boardId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
+    const board = await db.board.findFirst({
+      where: {
+        id: boardId,
+        organizationId: access.organization.id,
+      },
       select: { githubRepo: true },
     });
 
@@ -45,9 +45,9 @@ export async function POST(
   const { boardId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireBoardAccess(boardId, "admin");
+    if ("response" in access) {
+      return access.response;
     }
 
     const { repo, token } = await req.json();
@@ -75,7 +75,7 @@ export async function POST(
     }
 
     await db.board.update({
-      where: { id: boardId, ownerId: session.user.id },
+      where: { id: boardId },
       data: { githubRepo: repo, githubToken: token },
     });
 
@@ -95,13 +95,13 @@ export async function DELETE(
   const { boardId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireBoardAccess(boardId, "admin");
+    if ("response" in access) {
+      return access.response;
     }
 
     await db.board.update({
-      where: { id: boardId, ownerId: session.user.id },
+      where: { id: boardId },
       data: { githubRepo: null, githubToken: null },
     });
 

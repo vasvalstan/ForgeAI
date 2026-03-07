@@ -89,8 +89,20 @@ def get_board(board_id: str) -> Optional[dict]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                'SELECT id, title, "ownerId", "liveblocksRoomId" FROM "Board" WHERE id = %s',
+                'SELECT id, title, "organizationId", "createdById", "liveblocksRoomId" FROM "Board" WHERE id = %s',
                 (board_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def get_organization(organization_id: str) -> Optional[dict]:
+    """Fetch an organization by ID."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                'SELECT id, name, slug, credits FROM "Organization" WHERE id = %s',
+                (organization_id,)
             )
             row = cur.fetchone()
             return dict(row) if row else None
@@ -101,7 +113,7 @@ def get_user(user_id: str) -> Optional[dict]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                'SELECT id, email, name, credits FROM "User" WHERE id = %s',
+                'SELECT id, email, name, credits, "activeOrganizationId" FROM "User" WHERE id = %s',
                 (user_id,)
             )
             row = cur.fetchone()
@@ -115,6 +127,18 @@ def deduct_credits(user_id: str, amount: int) -> bool:
             cur.execute(
                 'UPDATE "User" SET credits = credits - %s WHERE id = %s AND credits >= %s RETURNING credits',
                 (amount, user_id, amount)
+            )
+            result = cur.fetchone()
+            return result is not None
+
+
+def deduct_organization_credits(organization_id: str, amount: int) -> bool:
+    """Deduct credits from an organization. Returns False if insufficient."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE "Organization" SET credits = credits - %s WHERE id = %s AND credits >= %s RETURNING credits',
+                (amount, organization_id, amount)
             )
             result = cur.fetchone()
             return result is not None

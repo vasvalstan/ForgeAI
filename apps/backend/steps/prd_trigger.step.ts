@@ -1,6 +1,6 @@
 import { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
-import { db } from "@forge/db";
+import { deductOrganizationCredits, getBoardTenantContext, hasValidInternalSecret } from "./tenant";
 
 export const config: ApiRouteConfig = {
   type: "api",
@@ -15,6 +15,7 @@ export const config: ApiRouteConfig = {
     boardId: z.string(),
     insightIds: z.array(z.string()).optional(),
     userId: z.string().optional(),
+    internalSecret: z.string().optional(),
   }),
   responseSchema: {
     200: z.object({
@@ -33,14 +34,21 @@ export const handler: Handlers['PRDTrigger'] = async (
   req,
   { logger, emit }
 ) => {
-  const { boardId, insightIds, userId } = req.body;
+  const { boardId, insightIds, internalSecret } = req.body;
+
+  if (!hasValidInternalSecret(internalSecret)) {
+    logger.warn("Rejected unauthorized PRD request", { boardId });
+    return {
+      status: 402 as const,
+      body: {
+        error: "Unauthorized backend request.",
+      },
+    };
+  }
 
   logger.info("PRD generation requested", { boardId, insightCount: insightIds?.length ?? "all" });
 
-  const board = await db.board.findUnique({
-    where: { id: boardId },
-    select: { id: true, ownerId: true },
-  });
+  const board = await getBoardTenantContext(boardId);
 
   if (!board) {
     return {
@@ -49,30 +57,17 @@ export const handler: Handlers['PRDTrigger'] = async (
     };
   }
 
-  const ownerId = userId || board.ownerId;
-  if (ownerId) {
-    const user = await db.user.findUnique({
-      where: { id: ownerId },
-      select: { credits: true },
-    });
-
-    if (user && user.credits < PRD_CREDIT_COST) {
-      return {
-        status: 402 as const,
-        body: {
-          error: `Insufficient credits. PRD generation requires ${PRD_CREDIT_COST} credits, but you have ${user.credits}.`,
-        },
-      };
-    }
-
-    if (user) {
-      await db.user.update({
-        where: { id: ownerId },
-        data: { credits: { decrement: PRD_CREDIT_COST } },
-      });
-      logger.info(`Deducted ${PRD_CREDIT_COST} credits from user ${ownerId}`);
-    }
+  const deduction = await deductOrganizationCredits(board.organizationId, PRD_CREDIT_COST);
+  if (!deduction.ok) {
+    return {
+      status: 402 as const,
+      body: {
+        error: `Insufficient credits. PRD generation requires ${PRD_CREDIT_COST} credits, but you have ${deduction.credits}.`,
+      },
+    };
   }
+
+  logger.info(`Deducted ${PRD_CREDIT_COST} credits from organization ${board.organizationId}`);
 
   await emit({
     topic: "prd.generate",
@@ -86,7 +81,7 @@ export const handler: Handlers['PRDTrigger'] = async (
     status: 200 as const,
     body: {
       status: "processing",
-      message: `PRD generation started. ${PRD_CREDIT_COST} credits deducted. The PRD will appear on your canvas shortly.`,
+      message: `PRD generation started. ${PRD_CREDIT_COST} organization credits deducted. The PRD will appear on your canvas shortly.`,
     },
   };
 };

@@ -20,7 +20,7 @@ interface CanvasShape {
 interface CanvasUpdateEvent {
   boardId: string;
   discoveryId?: string;
-  action: "explosion" | "audit";
+  action: "explosion" | "audit" | "add_consensus_warnings";
   shapes: CanvasShape[];
   connections?: Array<{
     fromInsightIndex: number;
@@ -29,12 +29,13 @@ interface CanvasUpdateEvent {
   }>;
 }
 
-const AUDIT_SHAPE_TYPES = new Set(["risk-flag"]);
-const ANIMATED_SHAPE_TYPES = new Set(["risk-flag"]);
+const AUDIT_SHAPE_TYPES = new Set(["risk-flag", "alert_card"]);
+const ANIMATED_SHAPE_TYPES = new Set(["risk-flag", "alert_card"]);
 
 const LIVEBLOCKS_API = "https://api.liveblocks.io/v2";
 const LIVEBLOCKS_SECRET = process.env.LIVEBLOCKS_SECRET_KEY ?? "";
-const NEXT_PUBLIC_URL = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+const NEXT_PUBLIC_URL = process.env.NEXT_PUBLIC_URL || "http://localhost:4000";
+const INTERNAL_SECRET = process.env.FORGE_INTERNAL_SECRET ?? "";
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 50;
 const RISK_FLAG_ANIMATION_STEP_MS = 45;
@@ -120,7 +121,8 @@ async function sendShapesToLiveblocks(
               rotation: 0,
               isLocked: false,
               props: shape.props,
-              ...(action === "audit" && shape.type === "risk-flag"
+              ...((action === "audit" && shape.type === "risk-flag") ||
+              (action === "add_consensus_warnings" && shape.type === "alert_card")
                 ? {
                     meta: {
                       entryAnimation: "fade-up",
@@ -129,6 +131,9 @@ async function sendShapesToLiveblocks(
                         RISK_FLAG_ANIMATION_MAX_DELAY_MS
                       ),
                       entryAnimationAt: broadcastAt,
+                      ...(action === "add_consensus_warnings"
+                        ? { consensusGlow: true }
+                        : {}),
                     },
                   }
                 : {}),
@@ -204,7 +209,12 @@ export const handler: Handlers['CanvasUpdate'] = async (input, { logger }) => {
 
     const pushRes = await fetch(`${NEXT_PUBLIC_URL}/api/canvas-updates`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(INTERNAL_SECRET
+          ? { "x-forge-internal-secret": INTERNAL_SECRET }
+          : {}),
+      },
       body: JSON.stringify({ boardId, shapes: enrichedShapes }),
     });
 

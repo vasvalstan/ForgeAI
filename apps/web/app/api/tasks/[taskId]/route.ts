@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireTaskAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -17,9 +9,9 @@ export async function PATCH(
   const { taskId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireTaskAccess(taskId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const body = await req.json();
@@ -50,9 +42,9 @@ export async function DELETE(
   const { taskId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireTaskAccess(taskId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     await db.task.delete({ where: { id: taskId } });

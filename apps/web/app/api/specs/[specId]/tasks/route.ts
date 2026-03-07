@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireTaskListAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,6 +9,11 @@ export async function GET(
   const { specId } = await params;
 
   try {
+    const access = await requireTaskListAccess(specId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
     const tasks = await db.task.findMany({
       where: { specId },
       orderBy: { createdAt: "asc" },
@@ -38,9 +35,9 @@ export async function POST(
   const { specId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireTaskListAccess(specId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const { title, description, complexity } = await req.json();

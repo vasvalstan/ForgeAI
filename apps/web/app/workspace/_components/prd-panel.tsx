@@ -20,9 +20,9 @@ interface PRDData {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  draft: { bg: "rgba(100, 116, 139, 0.10)", text: "#475569", border: "rgba(100, 116, 139, 0.20)" },
-  review: { bg: "rgba(245, 158, 11, 0.10)", text: "#B45309", border: "rgba(245, 158, 11, 0.25)" },
-  approved: { bg: "rgba(22, 163, 74, 0.10)", text: "#15803D", border: "rgba(22, 163, 74, 0.25)" },
+  draft: { bg: "var(--color-status-inactive, rgba(100,116,139,0.10))", text: "var(--color-forge-text-secondary)", border: "rgba(100, 116, 139, 0.20)" },
+  review: { bg: "rgba(245, 158, 11, 0.10)", text: "var(--color-forge-warning)", border: "rgba(245, 158, 11, 0.25)" },
+  approved: { bg: "rgba(22, 163, 74, 0.10)", text: "var(--color-forge-success)", border: "rgba(22, 163, 74, 0.25)" },
 };
 
 function renderMarkdown(content: string): React.ReactNode[] {
@@ -33,13 +33,13 @@ function renderMarkdown(content: string): React.ReactNode[] {
     const line = lines[i] ?? "";
     if (line.startsWith("## ")) {
       nodes.push(
-        <h2 key={i} style={{ fontSize: "16px", fontWeight: 700, color: "#0F172A", marginTop: i > 0 ? "20px" : 0, marginBottom: "8px" }}>
+        <h2 key={i} className="text-base font-bold text-forge-text" style={{ marginTop: i > 0 ? "20px" : 0, marginBottom: "8px" }}>
           {line.slice(3)}
         </h2>
       );
     } else if (line.startsWith("### ")) {
       nodes.push(
-        <h3 key={i} style={{ fontSize: "14px", fontWeight: 600, color: "#1E293B", marginTop: "16px", marginBottom: "6px" }}>
+        <h3 key={i} className="text-sm font-semibold text-forge-text" style={{ marginTop: "16px", marginBottom: "6px" }}>
           {line.slice(4)}
         </h3>
       );
@@ -49,35 +49,16 @@ function renderMarkdown(content: string): React.ReactNode[] {
       nodes.push(
         <blockquote
           key={i}
+          className="text-[13px] text-forge-text-secondary italic"
           style={{
             borderLeft: "3px solid rgba(37, 99, 235, 0.4)",
             paddingLeft: "12px",
             margin: "8px 0",
-            fontSize: "13px",
-            color: "#475569",
-            fontStyle: "italic",
           }}
         >
           {insightMatch ? (
             <span>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "3px",
-                  background: "rgba(37, 99, 235, 0.08)",
-                  border: "1px solid rgba(37, 99, 235, 0.18)",
-                  borderRadius: "4px",
-                  padding: "1px 6px",
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  color: "#2563EB",
-                  fontStyle: "normal",
-                  cursor: "pointer",
-                  marginRight: "4px",
-                }}
-                title="Evidence from user research"
-              >
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-primary-500 not-italic cursor-pointer mr-1 px-1.5 py-px rounded bg-primary-500/8 border border-primary-500/18" title="Evidence from user research">
                 <Lightning size={10} /> Evidence
               </span>
               {quoteText.replace(/\[INSIGHT:[^\]]+\]\s*/, "")}
@@ -89,8 +70,8 @@ function renderMarkdown(content: string): React.ReactNode[] {
       );
     } else if (line.startsWith("- ")) {
       nodes.push(
-        <div key={i} style={{ display: "flex", gap: "6px", fontSize: "13px", color: "#334155", lineHeight: "1.5", margin: "3px 0" }}>
-          <span style={{ color: "#64748B" }}>&#x2022;</span>
+        <div key={i} className="flex gap-1.5 text-[13px] text-forge-text-secondary leading-relaxed my-0.5">
+          <span className="text-forge-text-dim">&#x2022;</span>
           <span>{line.slice(2)}</span>
         </div>
       );
@@ -98,7 +79,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
       nodes.push(<div key={i} style={{ height: "8px" }} />);
     } else {
       nodes.push(
-        <p key={i} style={{ fontSize: "13px", color: "#334155", lineHeight: "1.6", margin: "4px 0" }}>
+        <p key={i} className="text-[13px] text-forge-text-secondary leading-relaxed my-1">
           {line}
         </p>
       );
@@ -174,7 +155,7 @@ export function PRDPanel() {
 
   if (!prdViewerOpen) return null;
 
-  const statusColor = STATUS_COLORS[prd?.status ?? "draft"] ?? { bg: "rgba(100, 116, 139, 0.10)", text: "#475569", border: "rgba(100, 116, 139, 0.20)" };
+  const statusColor = STATUS_COLORS[prd?.status ?? "draft"] ?? STATUS_COLORS.draft!;
 
   return (
     <div
@@ -191,35 +172,20 @@ export function PRDPanel() {
 
       {/* Panel */}
       <div
-        className="relative ml-auto h-full flex flex-col"
-        style={{
-          width: 540,
-          background: "rgba(255, 255, 255, 0.97)",
-          borderLeft: "1px solid var(--color-forge-border)",
-          boxShadow: "0 0 60px rgba(15, 23, 42, 0.12)",
-        }}
+        className="relative ml-auto h-full flex flex-col bg-forge-surface/97 dark:bg-forge-surface border-l border-forge-border shadow-panel"
+        style={{ width: 540 }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 flex-shrink-0"
-          style={{ height: "56px", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}
-        >
+        <div className="flex items-center justify-between px-5 h-14 flex-shrink-0 border-b border-forge-border-subtle">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              style={{
-                width: "28px", height: "28px", borderRadius: "8px",
-                background: "linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.06))",
-                border: "1px solid rgba(37, 99, 235, 0.18)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <FileText size={14} style={{ color: "#2563EB" }} />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary-500/10 border border-primary-500/18">
+              <FileText size={14} className="text-primary-500" />
             </div>
             <div className="min-w-0">
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div className="text-[13px] font-semibold text-forge-text truncate">
                 {prd?.title ?? "Loading..."}
               </div>
-              <div style={{ fontSize: "10px", color: "#64748B" }}>
+              <div className="text-[10px] text-forge-text-dim">
                 Product Requirements Document
               </div>
             </div>
@@ -229,11 +195,11 @@ export function PRDPanel() {
               <button
                 onClick={cycleStatus}
                 disabled={statusUpdating}
-                className="transition-all cursor-pointer"
+                className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-md transition-all cursor-pointer"
                 style={{
-                  fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em",
-                  padding: "3px 10px", borderRadius: "6px",
-                  background: statusColor.bg, color: statusColor.text, border: `1px solid ${statusColor.border}`,
+                  background: statusColor.bg,
+                  color: statusColor.text,
+                  border: `1px solid ${statusColor.border}`,
                 }}
                 title="Click to cycle status"
               >
@@ -242,8 +208,7 @@ export function PRDPanel() {
             )}
             <button
               onClick={closePrdViewer}
-              className="p-1.5 rounded-lg hover:bg-black/5 transition-colors cursor-pointer"
-              style={{ color: "#64748B" }}
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-forge-text-dim"
             >
               <X size={16} />
             </button>
@@ -253,18 +218,18 @@ export function PRDPanel() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm" style={{ color: "#64748B" }}>
+            <div className="flex items-center gap-2 text-sm text-forge-text-dim">
               <div className="flex gap-1">
-                <span className="animate-bounce text-xs" style={{ animationDelay: "0ms", color: "#2563EB" }}>&#x25CF;</span>
-                <span className="animate-bounce text-xs" style={{ animationDelay: "200ms", color: "#2563EB" }}>&#x25CF;</span>
-                <span className="animate-bounce text-xs" style={{ animationDelay: "400ms", color: "#2563EB" }}>&#x25CF;</span>
+                <span className="animate-bounce text-xs text-primary-500" style={{ animationDelay: "0ms" }}>&#x25CF;</span>
+                <span className="animate-bounce text-xs text-primary-500" style={{ animationDelay: "200ms" }}>&#x25CF;</span>
+                <span className="animate-bounce text-xs text-primary-500" style={{ animationDelay: "400ms" }}>&#x25CF;</span>
               </div>
               Loading PRD...
             </div>
           ) : prd ? (
             <div>{renderMarkdown(prd.content)}</div>
           ) : (
-            <div style={{ fontSize: "13px", color: "#64748B" }}>
+            <div className="text-[13px] text-forge-text-dim">
               PRD not found.
             </div>
           )}
@@ -272,25 +237,18 @@ export function PRDPanel() {
 
         {/* Footer */}
         {prd && prd.specs && prd.specs.length > 0 && (
-          <div
-            className="flex-shrink-0 px-5 py-3"
-            style={{ borderTop: "1px solid rgba(15, 23, 42, 0.08)" }}
-          >
-            <div style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B", marginBottom: "6px" }}>
+          <div className="flex-shrink-0 px-5 py-3 border-t border-forge-border-subtle">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-forge-text-dim mb-1.5">
               Linked Specs ({prd.specs.length})
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div className="flex flex-col gap-1">
               {prd.specs.map((spec) => (
                 <div
                   key={spec.id}
-                  style={{
-                    fontSize: "12px", color: "#334155", padding: "6px 8px",
-                    borderRadius: "6px", background: "rgba(15, 23, 42, 0.03)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                  }}
+                  className="text-xs text-forge-text-secondary p-1.5 rounded-lg bg-forge-surface-2 flex items-center justify-between"
                 >
                   <span>{spec.title}</span>
-                  <span style={{ fontSize: "10px", color: "#64748B" }}>
+                  <span className="text-[10px] text-forge-text-dim">
                     {spec._count?.tasks ?? 0} tasks
                   </span>
                 </div>
@@ -300,11 +258,8 @@ export function PRDPanel() {
         )}
 
         {/* ID Footer */}
-        <div
-          className="flex items-center px-5 flex-shrink-0"
-          style={{ height: "40px", borderTop: "1px solid rgba(15, 23, 42, 0.08)" }}
-        >
-          <span style={{ fontSize: "10px", color: "#94A3B8" }}>
+        <div className="flex items-center px-5 h-10 flex-shrink-0 border-t border-forge-border-subtle">
+          <span className="text-[10px] text-forge-text-dim/60">
             PRD ID: {selectedPrdId?.slice(0, 12)}...
           </span>
         </div>

@@ -37,17 +37,18 @@ export async function POST(req: NextRequest) {
     // Handle checkout.completed events
     if (event.type === "checkout.completed" || event.type === "order.created") {
       const metadata = event.data?.metadata ?? {};
+      const organizationId = metadata.organizationId;
       const userId = metadata.userId;
       const creditAmount = parseInt(metadata.creditAmount ?? "0", 10);
 
-      if (userId && creditAmount > 0) {
-        await db.user.update({
-          where: { id: userId },
+      if (organizationId && creditAmount > 0) {
+        await db.organization.update({
+          where: { id: organizationId },
           data: { credits: { increment: creditAmount } },
         });
 
         console.log(
-          `[Polar Webhook] Added ${creditAmount} credits to user ${userId}`
+          `[Polar Webhook] Added ${creditAmount} credits to organization ${organizationId} (requested by ${userId ?? "unknown"})`
         );
       }
     }

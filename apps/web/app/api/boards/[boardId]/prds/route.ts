@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireBoardAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,6 +9,11 @@ export async function GET(
   const { boardId } = await params;
 
   try {
+    const access = await requireBoardAccess(boardId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
     let prds;
     try {
       prds = await db.pRD.findMany({
@@ -51,9 +48,9 @@ export async function POST(
   const { boardId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireBoardAccess(boardId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const { title, content } = await req.json();

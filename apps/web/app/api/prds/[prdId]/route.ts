@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePRDAccess } from "@/lib/tenant-auth";
 import { db } from "@forge/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
-async function getSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -17,10 +9,20 @@ export async function GET(
   const { prdId } = await params;
 
   try {
+    const access = await requirePRDAccess(prdId, "viewer");
+    if ("response" in access) {
+      return access.response;
+    }
+
     let prd;
     try {
-      prd = await db.pRD.findUnique({
-        where: { id: prdId },
+      prd = await db.pRD.findFirst({
+        where: {
+          id: prdId,
+          board: {
+            organizationId: access.organization.id,
+          },
+        },
         include: {
           specs: {
             orderBy: { createdAt: "desc" },
@@ -30,8 +32,13 @@ export async function GET(
       });
     } catch {
       // Spec/Task tables may not exist yet pre-migration
-      prd = await db.pRD.findUnique({
-        where: { id: prdId },
+      prd = await db.pRD.findFirst({
+        where: {
+          id: prdId,
+          board: {
+            organizationId: access.organization.id,
+          },
+        },
       });
     }
 
@@ -56,9 +63,9 @@ export async function PATCH(
   const { prdId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requirePRDAccess(prdId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     const body = await req.json();
@@ -88,9 +95,9 @@ export async function DELETE(
   const { prdId } = await params;
 
   try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requirePRDAccess(prdId, "editor");
+    if ("response" in access) {
+      return access.response;
     }
 
     await db.pRD.delete({ where: { id: prdId } });
