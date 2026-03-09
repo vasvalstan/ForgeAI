@@ -1,12 +1,16 @@
 ---
-description: ForgeAI design system — colors, typography, spacing, components, and patterns. Reference this when building any UI.
+description: ForgeAI design system v7 — floating-card architecture. Colors, typography, spacing, components, patterns. Reference for all UI work.
 alwaysApply: true
 ---
 
-# ForgeAI Design System v6
+# ForgeAI Design System v7 — Floating-Card Architecture
 
-Reference design: `/assets/Screenshot_2026-03-07_at_11.43.53-205d57af-dd94-47af-a45e-cc683ba74ad2.png`
+Reference Figma: `figma.com/design/N29r0YQSwAAH2pE4q0dp7Y/Untitled?node-id=1-4971`
 Full spec: `DESIGN_SYSTEM.md` at project root.
+
+## Philosophy
+
+Every major UI region is a **floating rounded card** with `border border-forge-border`, `bg-forge-surface`, `shadow-card`, and generous `border-radius` (24–32px). The `forge-bg` background shows in the gaps between cards.
 
 ## Stack
 
@@ -24,154 +28,168 @@ Use CSS variables via Tailwind classes (e.g. `bg-forge-bg`, `text-forge-text`).
 
 ### Backgrounds
 
-| Token                  | Light            | Dark            | Usage                       |
-|------------------------|------------------|-----------------|-----------------------------|
-| `--color-forge-bg`     | `#F8F9FA`        | `#0a0a0a`       | App background (cool neutral)|
-| `--color-forge-surface`| `#ffffff`        | `#141414`       | Cards, panels, modals       |
-| `--color-forge-surface-2`| `#F1F3F5`     | `#1e1e1e`       | Toolbars, nested inputs     |
+| Token | Light | Dark | Usage |
+|---|---|---|---|
+| `--color-forge-bg` | `#F8F9FA` | `#0a0a0a` | App background, visible between floating cards |
+| `--color-forge-surface` | `#ffffff` | `#141414` | All floating cards, panels, modals |
+| `--color-forge-surface-2` | `#F1F3F5` | `#1e1e1e` | Toolbars, nested inputs, inset areas |
 
 ### Text
 
-| Token                        | Light      | Dark       |
-|------------------------------|------------|------------|
-| `--color-forge-text`         | `#212529`  | `#ececec`  |
-| `--color-forge-text-secondary`| `#495057` | `#a3a3a3`  |
-| `--color-forge-text-dim`     | `#868E96`  | `#888888`  |
+| Token | Light | Dark |
+|---|---|---|
+| `--color-forge-text` | `#212529` | `#ececec` |
+| `--color-forge-text-secondary` | `#495057` | `#a3a3a3` |
+| `--color-forge-text-dim` | `#868E96` | `#888888` |
 
 ### Borders
 
-| Token                        | Light                    | Dark                        |
-|------------------------------|--------------------------|-----------------------------|
-| `--color-forge-border`       | `rgba(0, 0, 0, 0.08)`   | `rgba(255, 255, 255, 0.12)` |
-| `--color-forge-border-subtle`| `rgba(0, 0, 0, 0.05)`   | `rgba(255, 255, 255, 0.08)` |
-
-### Status Badge Colors — PASTEL backgrounds with DARK text
-
-| Status   | Background | Text          | Class pattern                        |
-|----------|------------|---------------|--------------------------------------|
-| Running  | `#99E9F2`  | `forge-text`  | `bg-status-running text-forge-text`  |
-| Inactive | `#DEE2E6`  | `forge-text`  | `bg-status-inactive text-forge-text` |
-| Overdue  | `#FFC9C9`  | `forge-text`  | `bg-status-overdue text-forge-text`  |
-| Done     | `#B2F2BB`  | `forge-text`  | `bg-status-done text-forge-text`     |
-
-### Sidebar Active Highlight
-
-| Token                    | Value     | Usage                                |
-|--------------------------|-----------|--------------------------------------|
-| `--color-forge-amber-bg` | `#E9D8A6` | Selected sidebar item background     |
-| `--color-forge-amber`    | `#b8860b` | Team label text accent               |
+| Token | Light | Dark |
+|---|---|---|
+| `--color-forge-border` | `rgba(0, 0, 0, 0.08)` | `rgba(255, 255, 255, 0.12)` |
+| `--color-forge-border-subtle` | `rgba(0, 0, 0, 0.05)` | `rgba(255, 255, 255, 0.08)` |
 
 ### Accents
 
-| Token               | Value     | Usage                  |
-|----------------------|-----------|------------------------|
-| `--color-primary-*`  | `#2563eb` | Links, active states   |
-| `--color-brand-*`    | `#7c3aed` | Brand gradient, canvas |
+| Token | Value | Usage |
+|---|---|---|
+| `--color-primary-*` | `#2563eb` | Links, active states |
+| `--color-brand-*` | `#7c3aed` | Brand gradient, canvas |
+| `--color-forge-amber-bg` | `#E9D8A6` | Selected sidebar item |
+| `--color-forge-amber` | `#b8860b` | Team label text |
+
+### Status Badge Colors — PASTEL bg, DARK text
+
+| Status | Background | Class |
+|---|---|---|
+| Running | `#99E9F2` | `bg-status-running text-forge-text` |
+| Inactive | `#DEE2E6` | `bg-status-inactive text-forge-text` |
+| Overdue | `#FFC9C9` | `bg-status-overdue text-forge-text` |
+| Done | `#B2F2BB` | `bg-status-done text-forge-text` |
 
 ## Typography
 
 Font: **Inter** via `next/font/google` (`--font-inter`).
 
-| Role             | Size    | Weight   | Tracking     | Transform  |
-|------------------|---------|----------|--------------|------------|
-| Logo "FORGE AI"  | `16px`  | `700`    | `0.08em`     | `uppercase`|
-| Nav link         | `14px`  | `500`    | `-0.01em`    | —          |
-| Section header   | `11px`  | `600`    | `0.06em`     | `uppercase`|
-| Card title       | `14px`  | `600`    | `-0.01em`    | —          |
-| Card body        | `13px`  | `400`    | `-0.005em`   | —          |
-| Meta/dates       | `12px`  | `400`    | `0`          | —          |
-| Badge label      | `12px`  | `600`    | `0`          | —          |
-| Caption/helper   | `11px`  | `400`    | `0`          | —          |
+| Role | Size | Weight | Tracking | Transform |
+|---|---|---|---|---|
+| Logo "FORGE AI" | `16px` | `700` | `0.08em` | `uppercase` |
+| Nav link | `14px` | `500` | `-0.01em` | — |
+| Section header | `12px` | `600` | `0.06em` | `uppercase` |
+| Card title | `14px` | `600` | `-0.01em` | — |
+| Card body | `13px` | `400` | `-0.005em` | — |
+| Meta/dates | `12px` | `400` | `0` | — |
+| Badge label | `12px` | `600` | `0` | — |
+| Caption/helper | `11px` | `400` | `0` | — |
 
-## Spacing: 16–20px padding inside cards/sidebar items. Card grid gap: 16px.
+## Border Radius — Floating Card Scale
 
-## Border Radius
-
-| Element          | Radius          | Tailwind class   |
-|------------------|-----------------|------------------|
-| Cards            | `12–16px`       | `rounded-xl`     |
-| Status badges    | `9999px`        | `rounded-full`   |
-| Buttons          | `8px`           | `rounded-lg`     |
-| Avatars          | `9999px`        | `rounded-full`   |
-| Dropdown menus   | `12px`          | `rounded-xl`     |
-| Floating toolbar | `9999px`        | `rounded-full`   |
+| Element | Radius | Tailwind |
+|---|---|---|
+| Top nav bar | `28px` | `rounded-[28px]` |
+| Canvas panel | `28px` | `rounded-[28px]` |
+| Sidebar / AI panel | `24px` | `rounded-[24px]` |
+| Landing section cards | `32px` | `rounded-[32px]` |
+| Auth form cards | `28px` | `rounded-[28px]` |
+| Logo pill in nav | `20px` | `rounded-[20px]` |
+| Inner content cards | `12–16px` | `rounded-xl` |
+| Buttons | `8–12px` | `rounded-lg` / `rounded-xl` |
+| Input fields | `12px` | `rounded-xl` |
+| Status badges | `9999px` | `rounded-full` |
+| Bottom toolbar pill | `9999px` | `rounded-full` |
+| CTA buttons | `16px` | `rounded-2xl` |
 
 ## Shadows
 
 ```css
---shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);      /* soft wide spread */
+--shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);      /* all floating panels */
 --shadow-panel: 0 1px 2px rgba(15,23,42,0.06), 0 10px 28px rgba(15,23,42,0.10);
 --shadow-dropdown: 0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
 ```
 
-## Layout
+## Layout — Workspace
 
 ```
-┌──────────────────────────────────────────────────────┐
-│ Top Nav: Logo | Home · Settings | Search Avatars Share | Bell Avatar │
-├──────────┬──────────────────────────┬────────────────┤
-│ Projects │ Content (Cards/Canvas)   │ AI Assistant   │
-│ Sidebar  │                          │ Panel          │
-│ 240px    │ flex-1                   │ 280px          │
-├──────────┴──────────────────────────┴────────────────┤
-│ Bottom Toolbar (glassmorphism pill, centered icons)   │
-└──────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ px-4 pt-4                                                   │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ Top Nav (rounded-[28px], h-[60px], shadow-card)        │ │
+│ │ [Logo pill] Home Settings    Search Avatars Share Bell  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ gap-4, px-4 pt-3 pb-4                                       │
+│ ┌────────┐ ┌──────────────────────────┐ ┌────────────────┐ │
+│ │Sidebar │ │ Canvas (rounded-[28px])  │ │ AI Panel       │ │
+│ │260px   │ │ flex-1                   │ │ 320px          │ │
+│ │r-[24px]│ │                          │ │ r-[24px]       │ │
+│ └────────┘ └──────────────────────────┘ └────────────────┘ │
+│                                                             │
+│       [Sticker]  [pill toolbar]  [Code]                     │
+│       Bottom: pill center + flanking icon buttons           │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+## Layout — Landing Page
+
+- Floating nav: `rounded-[28px]`, `max-w-5xl`, `shadow-card`
+- Section cards: `rounded-[32px]`, `border`, `bg-forge-surface`, `shadow-card`
+- Canvas mockup: `rounded-[28px]`, `border`, `shadow-card`
+- CTA: `rounded-[32px]`, gradient bg
+
+## Layout — Auth Pages
+
+- Full-page `forge-bg`, floating nav pill `rounded-[20px]` at top
+- Form card: `rounded-[28px]`, `shadow-card`, `p-8`
+- Inputs: `h-12`, `rounded-xl`, `shadow-card`
 
 ## Component Patterns
 
-### Status Badge (PASTEL pill, dark text)
+### Floating Panel (universal pattern)
 
 ```tsx
-<span className={cn(
-  "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold",
-  status === "running" && "bg-status-running text-forge-text",
-  status === "inactive" && "bg-status-inactive text-forge-text",
-  status === "overdue" && "bg-status-overdue text-forge-text",
-  status === "done" && "bg-status-done text-forge-text",
-)}>
-  {label} <ChevronDown size={12} />
-</span>
+<div className="rounded-[24px] border border-forge-border bg-forge-surface shadow-card p-4">
+  {/* content */}
+</div>
 ```
 
-### Card (Task/Project)
+### Status Badge
 
 ```tsx
-<div className="bg-forge-surface rounded-xl shadow-card p-4 border border-forge-border-subtle">
-  <div className="flex items-center justify-between mb-2">
-    <span className="text-xs font-medium text-forge-amber">Team 1</span>
-    <StatusBadge status="running" />
-  </div>
-  <h3 className="text-sm font-semibold text-forge-text mb-1">{title}</h3>
-  <p className="text-[13px] text-forge-text-secondary line-clamp-2">{description}</p>
-  <div className="flex items-center justify-between mt-3 text-xs text-forge-text-dim">
-    <span>Due: {date}</span>
-    <AvatarStack users={assignees} />
-  </div>
-</div>
+<span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-status-running text-forge-text">
+  Running
+</span>
 ```
 
 ### Sidebar Tree Item
 
 ```tsx
-<button className={cn(
-  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors",
+<button className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] transition-colors ${
   isSelected
     ? "bg-forge-amber-bg text-forge-text font-medium"
-    : "text-forge-text-secondary hover:bg-black/[0.03]"
-)}>
+    : "text-forge-text-secondary hover:bg-forge-surface-2"
+}`}>
 ```
 
 ### Bottom Floating Toolbar
 
 ```tsx
-<div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 glass rounded-full px-2 py-1.5 flex items-center gap-1 shadow-panel">
-  {tools.map(tool => <IconButton key={tool.id} ... />)}
+<div className="pointer-events-none fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-4">
+  <button className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-forge-border bg-forge-surface shadow-card" />
+  <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-forge-border bg-forge-surface px-4 py-3 shadow-panel">
+    {/* tool icons separated by w-px dividers */}
+  </div>
+  <button className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-forge-border bg-forge-surface shadow-card" />
 </div>
+```
+
+### Input Field
+
+```tsx
+<input className="h-12 w-full rounded-xl border border-forge-border bg-forge-surface px-4 text-forge-text shadow-card transition-all placeholder:text-forge-text-dim focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30" />
 ```
 
 ## Conventions
 
+- **Floating cards everywhere**: Every panel, form, nav, section is a floating rounded card
 - Prefer CSS variables via Tailwind classes over inline `style={{ }}` props
 - Use `cn()` from `clsx`/`tailwind-merge` for conditional classes
 - All interactive elements: `cursor-pointer`, visible focus ring

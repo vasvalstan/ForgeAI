@@ -14,7 +14,15 @@ import {
 } from "@/lib/canvas/shapes";
 import { DiscoveryDropZone } from "./discovery-drop-zone";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
-import { ChatCircleDots, SquaresFour } from "@phosphor-icons/react";
+import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  CaretDown,
+  DotsThree,
+  MagnifyingGlass,
+  ShareNetwork,
+  SquaresFour,
+} from "@phosphor-icons/react";
 import { useSession } from "@/lib/auth-client";
 import { getPresenceColor } from "@/lib/liveblocks-client";
 
@@ -72,12 +80,6 @@ export function CanvasPanel() {
   const handleMount = useCallback((editor: Editor) => {
     editorRef.current = editor;
     (globalThis as any).__forgeEditor = editor;
-
-    // Seed demo shapes on first load so the canvas isn't empty
-    const existing = editor.getCurrentPageShapes();
-    if (existing.length === 0) {
-      seedDemoShapes(editor);
-    }
   }, []);
 
   const handleFileDrop = useCallback(
@@ -217,13 +219,6 @@ export function CanvasPanel() {
     },
     [session?.user?.id, session?.user?.name]
   );
-
-  const handleAddComment = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const center = editor.getViewportScreenCenter();
-    createComment(center.x - 110, center.y - 60, "");
-  }, [createComment]);
 
   const handleSaveShapeEdit = useCallback(() => {
     const editor = editorRef.current;
@@ -390,13 +385,22 @@ export function CanvasPanel() {
       }
     };
 
+    const handleFloatingComment = () => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const center = editor.getViewportScreenCenter();
+      createComment(center.x - 110, center.y - 60, "");
+    };
+
     globalThis.addEventListener("forge:open-shape-editor", handleOpenEditor);
     globalThis.addEventListener("forge:add-shape-comment", handleCommentForShape);
     globalThis.addEventListener("forge:visualize-feature", handleVisualize);
+    globalThis.addEventListener("forge:add-floating-comment", handleFloatingComment);
     return () => {
       globalThis.removeEventListener("forge:open-shape-editor", handleOpenEditor);
       globalThis.removeEventListener("forge:add-shape-comment", handleCommentForShape);
       globalThis.removeEventListener("forge:visualize-feature", handleVisualize);
+      globalThis.removeEventListener("forge:add-floating-comment", handleFloatingComment);
     };
   }, [createComment, selectedBoardId]);
 
@@ -404,7 +408,7 @@ export function CanvasPanel() {
 
   if (!selectedBoardId) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center bg-forge-bg">
         <div className="text-center max-w-sm">
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
@@ -471,16 +475,50 @@ export function CanvasPanel() {
         persistenceKey={`forge-board-${selectedBoardId}`}
       />
 
-      <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={handleAddComment}
-          className="glass rounded-xl px-3 py-2 text-sm font-medium transition-colors cursor-pointer hover:bg-forge-surface-2 flex items-center gap-2"
-          style={{ color: "var(--color-forge-text)" }}
-          title="Drop a comment bubble"
-        >
-          <ChatCircleDots size={16} style={{ color: "var(--color-brand-500)" }} />
-          Add Comment
-        </button>
+      <div className="pointer-events-none absolute inset-x-4 top-4 z-50 flex items-start justify-between">
+        <div className="pointer-events-auto flex h-12 items-center gap-1 rounded-full border border-forge-border bg-forge-surface px-2 shadow-card">
+          <button className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-forge-text transition-colors hover:bg-forge-surface-2">
+            Page 1
+            <CaretDown size={14} className="text-forge-text-dim" />
+          </button>
+          <div className="mx-1 h-5 w-px bg-forge-border" />
+          <button className="rounded-xl p-2 text-forge-text-dim transition-colors hover:bg-forge-surface-2 hover:text-forge-text">
+            <ArrowCounterClockwise size={16} />
+          </button>
+          <button className="rounded-xl p-2 text-forge-text-dim transition-colors hover:bg-forge-surface-2 hover:text-forge-text">
+            <ArrowClockwise size={16} />
+          </button>
+          <button className="rounded-xl p-2 text-forge-text-dim transition-colors hover:bg-forge-surface-2 hover:text-forge-text">
+            <DotsThree size={16} />
+          </button>
+        </div>
+
+        <div className="pointer-events-auto flex h-12 items-center gap-3 rounded-full border border-forge-border bg-forge-surface px-4 shadow-card">
+          <MagnifyingGlass size={16} className="text-forge-text-secondary" />
+          <div className="flex items-center -space-x-2">
+            {["A", "D", "K"].map((initial, index) => (
+              <div
+                key={initial}
+                className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-forge-surface text-[10px] font-semibold text-white"
+                style={{
+                  background:
+                    index === 0
+                      ? "#111827"
+                      : index === 1
+                        ? "#0f766e"
+                        : "#7c3aed",
+                }}
+              >
+                {initial}
+              </div>
+            ))}
+          </div>
+          <CaretDown size={14} className="text-forge-text-dim" />
+          <button className="flex items-center gap-2 rounded-xl border border-forge-border px-3 py-2 text-sm font-medium text-forge-text transition-colors hover:bg-forge-surface-2">
+            <ShareNetwork size={16} />
+            Share
+          </button>
+        </div>
       </div>
 
       {shapeEditor && (
@@ -548,184 +586,4 @@ export function CanvasPanel() {
       {isDraggingFile && <DiscoveryDropZone />}
     </div>
   );
-}
-
-/**
- * Seed the canvas with demo shapes to showcase the custom shape types.
- */
-function seedDemoShapes(editor: Editor) {
-  const cx = 400;
-  const cy = 300;
-
-  // Pain point sticky notes
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx - 580,
-    y: cy - 280,
-    props: {
-      w: 260, h: 180,
-      text: "Users can't find the export button. 5 out of 8 participants failed this task.",
-      quote: "I looked everywhere but couldn't figure out how to get my data out.",
-      category: "pain_point",
-      sentiment: -0.7,
-      insightId: "demo-1",
-      source: "",
-    },
-  } as any);
-
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx - 580,
-    y: cy - 60,
-    props: {
-      w: 260, h: 180,
-      text: "Onboarding flow takes too long. Average completion time was 12 minutes.",
-      quote: "I almost gave up during setup because there were so many steps.",
-      category: "pain_point",
-      sentiment: -0.5,
-      insightId: "demo-2",
-      source: "",
-    },
-  } as any);
-
-  // Feature request sticky notes
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx - 280,
-    y: cy - 280,
-    props: {
-      w: 260, h: 180,
-      text: "Users want real-time collaboration. Mentioned in 6 of 8 interviews.",
-      quote: "If I could work on this with my team at the same time, that would be huge.",
-      category: "feature_request",
-      sentiment: 0.2,
-      insightId: "demo-3",
-      source: "",
-    },
-  } as any);
-
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx - 280,
-    y: cy - 60,
-    props: {
-      w: 260, h: 180,
-      text: "Keyboard shortcuts requested repeatedly. Power users feel slowed down by mouse-only workflows.",
-      quote: "I wish I could just hit Cmd+K to do everything.",
-      category: "feature_request",
-      sentiment: 0.1,
-      insightId: "demo-4",
-      source: "",
-    },
-  } as any);
-
-  // Praise sticky notes
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx + 20,
-    y: cy - 280,
-    props: {
-      w: 260, h: 180,
-      text: "Visual design praised by all participants. Dark theme especially loved.",
-      quote: "This is honestly the most beautiful tool I've used for this kind of work.",
-      category: "praise",
-      sentiment: 0.9,
-      insightId: "demo-5",
-      source: "",
-    },
-  } as any);
-
-  // Question sticky note
-  editor.createShape({
-    id: createShapeId(),
-    type: "sticky-note",
-    x: cx + 20,
-    y: cy - 60,
-    props: {
-      w: 260, h: 180,
-      text: "Unclear how the AI features are priced. Users worry about hidden costs.",
-      quote: "Is this going to get expensive as my team grows?",
-      category: "question",
-      sentiment: -0.1,
-      insightId: "demo-6",
-      source: "",
-    },
-  } as any);
-
-  // Feature cards
-  editor.createShape({
-    id: createShapeId(),
-    type: "feature-card",
-    x: cx - 580,
-    y: cy + 180,
-    props: {
-      w: 300, h: 160,
-      title: "Real-time Collaboration",
-      description: "Enable multiple users to edit the same board simultaneously with live cursors and presence indicators.",
-      priority: "critical",
-    },
-  } as any);
-
-  editor.createShape({
-    id: createShapeId(),
-    type: "feature-card",
-    x: cx - 250,
-    y: cy + 180,
-    props: {
-      w: 300, h: 160,
-      title: "Keyboard Shortcuts System",
-      description: "Implement a comprehensive Cmd+K command palette and keyboard shortcuts for power users.",
-      priority: "high",
-    },
-  } as any);
-
-  editor.createShape({
-    id: createShapeId(),
-    type: "feature-card",
-    x: cx + 80,
-    y: cy + 180,
-    props: {
-      w: 300, h: 160,
-      title: "Improved Export Flow",
-      description: "Redesign the export feature with clearer affordances and multiple format options (PDF, PNG, CSV).",
-      priority: "high",
-    },
-  } as any);
-
-  // Risk flags
-  editor.createShape({
-    id: createShapeId(),
-    type: "risk-flag",
-    x: cx + 320,
-    y: cy - 280,
-    props: {
-      w: 280, h: 140,
-      severity: "high",
-      reasoning: "3 features marked as 'critical' or 'high' priority. Team bandwidth supports 1 major initiative per quarter. Risk of scope creep.",
-      targetShapeId: "",
-    },
-  } as any);
-
-  editor.createShape({
-    id: createShapeId(),
-    type: "risk-flag",
-    x: cx + 320,
-    y: cy - 100,
-    props: {
-      w: 280, h: 140,
-      severity: "medium",
-      reasoning: "Real-time collaboration is the top request but has no pain point directly tied to it. Validate that this solves a real workflow issue, not just a 'nice to have.'",
-      targetShapeId: "",
-    },
-  } as any);
-
-  // Zoom to fit all shapes
-  setTimeout(() => {
-    editor.zoomToFit({ animation: { duration: 500 } });
-  }, 100);
 }

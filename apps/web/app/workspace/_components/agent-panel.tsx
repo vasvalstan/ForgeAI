@@ -197,10 +197,9 @@ export function AgentPanel() {
   const isNewChat = messages.length === 0;
 
   return (
-    <div className="h-full flex flex-col bg-forge-bg text-forge-text" style={{ fontFamily: "var(--font-sans)" }}>
-      {/* Header */}
-      <header className="px-4 pt-4 pb-3 flex items-center justify-between flex-shrink-0">
-        <span className="text-[13px] font-bold tracking-tight text-forge-text uppercase">
+    <div className="h-full flex flex-col bg-forge-surface text-forge-text px-4 py-4" style={{ fontFamily: "var(--font-sans)" }}>
+      <header className="pb-4 flex items-center justify-between flex-shrink-0">
+        <span className="text-[12px] font-semibold tracking-[0.06em] text-forge-text-secondary uppercase">
           AI Assistant
         </span>
         <div className="flex items-center gap-1.5 text-forge-text-dim">
@@ -213,12 +212,11 @@ export function AgentPanel() {
         </div>
       </header>
 
-      {/* Model + New Chat Row */}
-      <div className="px-4 pb-3 flex items-center gap-2 flex-shrink-0">
+      <div className="pb-4 flex items-center gap-2 flex-shrink-0">
         <div className="relative">
           <button
             onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-            className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-forge-border hover:bg-forge-surface-2 transition-colors cursor-pointer text-forge-text"
+            className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-forge-border hover:bg-forge-surface-2 transition-colors cursor-pointer text-forge-text shadow-card"
           >
             {selectedModel} <CaretDown size={10} />
           </button>
@@ -242,18 +240,16 @@ export function AgentPanel() {
 
         <button
           onClick={() => setMessages([])}
-          className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-forge-border hover:bg-forge-surface-2 transition-colors cursor-pointer text-forge-text ml-auto"
+          className="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-forge-border hover:bg-forge-surface-2 transition-colors cursor-pointer text-forge-text ml-auto shadow-card"
         >
           <Plus size={14} /> New chat
         </button>
       </div>
 
-      {/* Main Content */}
       {isNewChat ? (
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Input */}
-          <div className="px-4 flex-shrink-0">
-            <div className="flex items-center gap-2 rounded-xl border border-forge-border bg-forge-surface px-3 py-2.5">
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 rounded-2xl border border-forge-border bg-forge-surface px-3 py-3 shadow-card">
               <Plus size={16} className="text-forge-text-dim flex-shrink-0" />
               <input
                 type="text"
@@ -295,8 +291,7 @@ export function AgentPanel() {
 
           <div className="flex-1" />
 
-          {/* Past Chats */}
-          <div className="px-4 pb-4 flex-shrink-0">
+          <div className="pb-1 flex-shrink-0">
             <div className="flex items-center justify-between text-[13px] mb-3">
               <span className="font-semibold text-forge-text">Past chats</span>
               <button className="text-forge-text-dim hover:text-forge-text cursor-pointer transition-colors text-[13px]">
@@ -322,8 +317,7 @@ export function AgentPanel() {
         </div>
       ) : (
         <>
-          {/* Chat Messages */}
-          <section ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <section ref={scrollRef} className="flex-1 overflow-y-auto py-2 space-y-4">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "system" || msg.role === "assistant" ? (
@@ -358,9 +352,8 @@ export function AgentPanel() {
             )}
           </section>
 
-          {/* Input for Active Chat */}
-          <div className="px-4 pb-3 pt-1 flex-shrink-0">
-            <div className="flex items-center gap-2 rounded-xl border border-forge-border bg-forge-surface px-3 py-2.5">
+          <div className="pb-1 pt-3 flex-shrink-0">
+            <div className="flex items-center gap-2 rounded-2xl border border-forge-border bg-forge-surface px-3 py-3 shadow-card">
               <Plus size={16} className="text-forge-text-dim flex-shrink-0" />
               <input
                 type="text"

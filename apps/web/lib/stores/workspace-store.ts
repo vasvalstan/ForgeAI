@@ -135,8 +135,8 @@ interface WorkspaceState {
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedBoardId: null,
   selectedDiscoveryId: null,
-  sidebarWidth: 240,
-  agentPanelWidth: 280,
+  sidebarWidth: 260,
+  agentPanelWidth: 320,
   sidebarCollapsed: false,
   agentPanelCollapsed: false,
   expandedSections: new Set<TreeSection>(["boards"]),

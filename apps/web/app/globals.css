@@ -149,21 +149,29 @@ body {
   box-shadow: var(--shadow-panel);
 }
 
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+.shadow-dropdown {
+  box-shadow: var(--shadow-dropdown);
+}
+
 .shadow-glow {
   box-shadow: var(--shadow-glow);
 }
 
 /* ─── ForgeAI Canvas Overrides ───────────────────────────── */
 .tl-background {
-  background: var(--color-ink-950) !important;
+  background: var(--color-forge-bg) !important;
 }
 
 .tl-canvas {
   background:
     radial-gradient(
-      circle at 50% 50%,
-      rgba(124, 58, 237, 0.028) 0%,
-      transparent 65%
+      circle at 50% 35%,
+      rgba(124, 58, 237, 0.018) 0%,
+      transparent 58%
     ) !important;
 }
 
@@ -173,11 +181,17 @@ body {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(var(--color-forge-border-subtle) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-forge-border-subtle) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px);
+  background-size: 30px 30px;
   pointer-events: none;
   z-index: 0;
+}
+
+.dark .tl-canvas::before {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
 /* ─── Drop Zone ──────────────────────────────────────────── */

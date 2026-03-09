@@ -12,9 +12,9 @@ import { BottomToolbar } from "./_components/bottom-toolbar";
 
 export default function WorkspaceLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed);
   const agentPanelCollapsed = useWorkspaceStore((s) => s.agentPanelCollapsed);
   const sidebarWidth = useWorkspaceStore((s) => s.sidebarWidth);
@@ -91,50 +91,55 @@ export default function WorkspaceLayout({
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-forge-bg">
-      {/* Top Navigation Bar */}
       <TopNav />
 
-      {/* Main 3-panel area */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Panel — PM Sidebar */}
-        <div
-          className={`flex-shrink-0 overflow-hidden border-r relative group ${!isDraggingLeft ? "transition-all duration-300 ease-in-out" : ""}`}
-          style={{ width: sidebarCollapsed ? 48 : sidebarWidth, borderColor: "var(--color-forge-border-subtle)" }}
-        >
-          <PMSidebar />
-          {!sidebarCollapsed && (
-            <div 
-              className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors z-50"
-              onMouseDown={(e) => { e.preventDefault(); setIsDraggingLeft(true); }}
-            />
-          )}
-        </div>
+      <div className="flex-1 min-h-0 px-4 pb-4 pt-3">
+        <div className="flex h-full min-h-0 gap-4">
+          <div
+            className={`group relative flex-shrink-0 overflow-hidden rounded-[24px] border border-forge-border bg-forge-surface shadow-card ${isDraggingLeft ? "" : "transition-all duration-300 ease-in-out"}`}
+            style={{ width: sidebarCollapsed ? 56 : sidebarWidth }}
+          >
+            <PMSidebar />
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                aria-label="Resize sidebar"
+                className="absolute right-0 top-0 h-full w-2 cursor-col-resize opacity-0 transition-opacity group-hover:opacity-100"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsDraggingLeft(true);
+                }}
+              />
+            )}
+          </div>
 
-        {/* Middle — Canvas */}
-        <div className="flex-1 min-w-0 relative">
-          <CanvasPanel />
-          {children}
-        </div>
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-[28px] border border-forge-border bg-forge-surface shadow-card">
+            <CanvasPanel />
+            {children}
+          </div>
 
-        {/* Right Panel — AI Agents */}
-        <div
-          className={`flex-shrink-0 overflow-hidden border-l relative group ${!isDraggingRight ? "transition-all duration-300 ease-in-out" : ""}`}
-          style={{ width: agentPanelCollapsed ? 48 : agentPanelWidth, borderColor: "var(--color-forge-border-subtle)" }}
-        >
-          {!agentPanelCollapsed && (
-            <div 
-              className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors z-50"
-              onMouseDown={(e) => { e.preventDefault(); setIsDraggingRight(true); }}
-            />
-          )}
-          <AgentPanel />
+          <div
+            className={`group relative flex-shrink-0 overflow-hidden rounded-[24px] border border-forge-border bg-forge-surface shadow-card ${isDraggingRight ? "" : "transition-all duration-300 ease-in-out"}`}
+            style={{ width: agentPanelCollapsed ? 56 : agentPanelWidth }}
+          >
+            {!agentPanelCollapsed && (
+              <button
+                type="button"
+                aria-label="Resize assistant panel"
+                className="absolute left-0 top-0 h-full w-2 cursor-col-resize opacity-0 transition-opacity group-hover:opacity-100"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsDraggingRight(true);
+                }}
+              />
+            )}
+            <AgentPanel />
+          </div>
         </div>
       </div>
 
-      {/* Bottom Floating Toolbar */}
       <BottomToolbar />
 
-      {/* Slide-over Panels */}
       <SourceViewer />
       <PRDPanel />
     </div>
